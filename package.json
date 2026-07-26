@@ -5,6 +5,8 @@
   "description": "Read government documents at tolerance 0 — every line certified, never sampled.",
   "license": "MIT",
   "scripts": {
+    "test": "node test/test.js && node test/engine.test.js",
+    "test:engine": "node test/engine.test.js",
     "certify:ftclone": "node ftclone/certify.mjs"
   },
   "devDependencies": {
