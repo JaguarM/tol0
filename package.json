@@ -18,7 +18,9 @@
     "sync:recto": "node tools/sync-recto.mjs",
     "sync:recto:check": "node tools/sync-recto.mjs --check",
     "recto-test": "node tools/test-recto-app.mjs",
-    "lab:selftest": "node lab/selftest.mjs"
+    "lab:selftest": "node lab/selftest.mjs",
+    "rust:build": "cargo build --release --manifest-path lab/rust/Cargo.toml",
+    "rust:certify": "node lab/rust/certify.mjs"
   },
   "dependencies": {
     "mupdf": "^1.28.0"

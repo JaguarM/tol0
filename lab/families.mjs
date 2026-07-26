@@ -81,6 +81,24 @@ export const LAWS = {
   mid:    lut(c => { const t = 255 - c; return Math.max(0, Math.min(255, t + (t >> 7) - ((255 - t) >> 7))); }),
 };
 
+/** The DISTINCT laws, in LAWS order, the first name winning — and this is a
+ *  correction, measured 2026-07-26 while certifying `lab/rust`.
+ *
+ *  **`fzLin`, `fzLin254` and `mid` are ONE map**: they agree on all 256
+ *  coverages, so three of the six entries above are aliases. `min(255, b+1)`
+ *  guards a case fz can never produce (b = 255 is not in [128,254]), and the
+ *  Calibri midpoint push lands on the same bytes as the +1 post-law. Only four
+ *  laws here are distinguishable from pixels: `fz`, `src`, `fzLin`, `srcLin`.
+ *
+ *  A sweep that enumerated all six reported every linear-family hit THREE
+ *  times and then answered "which law?" with whichever alias came first in
+ *  this object — an ambiguity that looked like evidence. Sweeps iterate this
+ *  list; `identify` still keys `LAWS` by name, so a family may keep citing the
+ *  law it was proven with. Two names for one map is honest documentation; two
+ *  names in one search is not. */
+export const LAW_NAMES = Object.keys(LAWS).filter((k, i, all) =>
+  !all.slice(0, i).some(p => LAWS[p].every((v, c) => v === LAWS[k][c])));
+
 /** Smallest coverage a law renders as ink (byte < pgm.INK). The LUTs are
  *  monotone in coverage, so this is the threshold at which a candidate's bbox
  *  is measured — and it MUST be the law's own, not a constant. Using a fixed

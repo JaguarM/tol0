@@ -7,7 +7,7 @@
 //   node lab/sweep.mjs --targets <hunt> --at 786              # skip stage A
 //   knobs: --report out.json  --min-dim 0.75  --screen 6  --wobble [N]
 //
-// ## Two stages, because the full grid is 64×64 pens × 5 laws per glyph
+// ## Two stages, because the full grid is 64×64 pens × 4 distinct laws per glyph
 //
 // **Stage A — the dimensions prefilter.** For a handful of high-observation
 // characters, render at two pens and demand the ink bbox be within ±1 px of
@@ -16,7 +16,7 @@
 //
 // **Stage B — the exact sweep.** On each survivor, walk the whole 64×64 pen
 // lattice. Every render is cropped at the LAW'S OWN ink threshold and hashed
-// against every target of that character under all five laws at once. It runs
+// against every target of that character under all four distinct laws at once. It runs
 // on a screen of the most-observed characters first, and only opens up to the
 // full alphabet for a configuration that already scored — a wrong config
 // scores zero on the common letters and is abandoned in milliseconds.
@@ -36,7 +36,7 @@
 // the lattice.
 import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs';
 import { FTClone } from '../ftclone/ftclone.mjs';
-import { FAMILIES, LAWS, covMin, FONT_DIRS, face } from './families.mjs';
+import { FAMILIES, LAWS, LAW_NAMES, covMin, FONT_DIRS, face } from './families.mjs';
 import { readPgm, inkBbox, covBbox } from './pgm.mjs';
 
 const LAB = new URL('.', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1').replace(/\/$/, '');
@@ -163,7 +163,10 @@ function sweepConfig(clone, fontName, em64, cps) {
       for (let fx = 0; fx < 64; fx += XSTEP) {
         const cov = clone.coverage(cp, em64, em64, PENX * 64 + fx, BASEY * 64 + fy);
         if (!cov) { fy = 64; break; }
-        for (const [law, lut] of Object.entries(LAWS)) {
+        // LAW_NAMES, not Object.keys(LAWS): three of the six names are the
+        // same LUT, and enumerating all six triple-counted every linear hit.
+        for (const law of LAW_NAMES) {
+          const lut = LAWS[law];
           const b = covBbox(cov, W, H, covMin[law]);
           if (!b || b.w > 30 || b.h > 30) continue;
           if (!T.dims.some(d => d[0] === b.w && d[1] === b.h)) continue;
@@ -244,7 +247,7 @@ for (const r of ranked.slice(0, 12))
 if (!ranked.length) {
   console.log('  NONE — no (face, em64, pen, law) in this roster reproduces one target byte-exactly.');
   console.log('  That is a statement about THIS ROSTER (../docs/METHOD.md rule 3). Say what it enumerated:');
-  console.log(`    ${FONTS.length} faces, em64 ${AT ? AT.join(',') : `${EMS[0]}..${EMS[1]}`}, all 4096 pens, ${Object.keys(LAWS).length} laws.`);
+  console.log(`    ${FONTS.length} faces, em64 ${AT ? AT.join(',') : `${EMS[0]}..${EMS[1]}`}, all 4096 pens, ${LAW_NAMES.length} laws.`);
 } else {
   console.log(`\nconfirm the winner before believing it:  node lab/identify.mjs --targets <hunt> --scan ${ranked[0].font} --ems ${ranked[0].em64}..${ranked[0].em64} --law ${ranked[0].law.replace('~', '')}`);
 }

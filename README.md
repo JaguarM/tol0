@@ -31,6 +31,7 @@ tuple from pixels alone.
 npm install
 npm run certify:ftclone   # the rasterizer clone vs the real mupdf
 npm test                  # engine primitives on synthetic pages (~40 ms)
+npm run rust:build && npm run rust:certify   # the lab's fast engine (needs cargo)
 ```
 
 ```
@@ -40,11 +41,14 @@ CERTIFIED TTF y-phase  0/64 — 0 diffs over 1128 renders
 CERTIFIED CFF y-phase  0/64 — 0 diffs over 1128 renders
 ```
 
-Neither needs a PDF, a corpus document, or a system font — a deliberate
+None of those needs a PDF, a corpus document, or a system font — a deliberate
 constraint, not a convenience. `ftclone/` is a JS port of the glyph pipeline
 inside **mupdf 1.28 wasm** (FreeType 2.13 smooth rasterizer, integer 26.6
 throughout); everything else depends on it, so it certifies itself against the
-real thing, in two pipelines that share almost no code below the outline.
+real thing, in two pipelines that share almost no code below the outline. The
+third line holds the same line one level further out: `lab/rust/` is a port of
+*that* port, and it proves itself against it over 3,000 seeded tuples and two
+whole control sweeps drawn from the faces this repo ships.
 
 ## A read, end to end
 
@@ -150,6 +154,7 @@ engine/     the DOM-free matcher: ink bands, baseline pin, the composite-aware
             scan, object/redaction detection, the per-line certificate
 tools/      fontgen · glyph registry/bundle · rasterizer · reader CLI · gate · sync
 lab/        the other half: what produced these pixels? (see lab/README.md)
+lab/rust/   optional: that half's exhaustive search, 40–45× and certified against it
 fixtures/   gate documents (gitignored) + the reference transcripts
 fonts/      the source faces this repo may legally ship
 docs/       the laws, the method, the font/licence story
@@ -178,10 +183,13 @@ Ported from a larger private working repo, one certified layer at a time.
 - [x] **7. `lab/`** — the hunt half in 8 files, with its own end-to-end gate:
       a gate document is re-identified blind, 93/107 targets, every other
       family flat zero
-- [ ] 8. `lab/rust/` — the fast sweep engine, with its own certify gate
+- [x] **8. `lab/rust/`** — the sweep at 40–45×, the anisotropic probe and the
+      connected-component harvester, certified against the JS as its oracle
+      and running that gate **with no corpus at all**
 
-Open, and known: a **synthetic gate** (a page whose transcript is known, built
-with no corpus pixels) is the one thing that would let a stranger run anything —
-`fixtures/gate-ref` proves the reader, but only against documents that cannot be
-shipped. Also unsettled: the licence, and whether `ftclone` still certifies
-against a *different* mupdf build — i.e. what exactly the compatibility claim is.
+Open, and known: the **reader's** gate still needs documents that cannot be
+shipped, so a stranger can run `certify:ftclone`, `test` and `rust:certify` but
+0 of 18 gate documents; the synthetic half of that problem is solved for the
+rasterizer and the lab, not yet for a whole page whose transcript is known.
+Also unsettled: whether `ftclone` still certifies against a *different* mupdf
+build — i.e. what exactly the compatibility claim is.

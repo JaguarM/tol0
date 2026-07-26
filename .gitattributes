@@ -18,3 +18,6 @@
 # signal, so nothing may normalize them.
 fixtures/**   -text
 tools/gate-ref/** -text
+# and the same for the Rust engine's goldens: they are lab/sweep.mjs's recorded
+# output, compared string-for-string against a fresh run.
+lab/rust/fixtures/** -text

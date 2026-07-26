@@ -27,12 +27,18 @@ Tahoma family, the largest tol-0 population in the corpus, was found by the m
 bank and proven the same day. Steps 2–5 cost progressively more, and step 5
 costs hours.
 
+Two of those steps have a fast twin in **[rust/](rust/)**, which is the same
+search certified against this JavaScript: `hunt sweep` is step 5 at 40–45×, and
+`hunt harvest` is the **connected-component** harvester, which needs no
+lattice and so works where `harvest.mjs` cannot. One `npm run rust:build` and
+step 5 stops being an afternoon.
+
 Once you have an answer, it leaves the lab: add the entry to `families.mjs`,
 build the glyph set with `tools/fontgen.mjs`, add a pool to
 `tools/glyph-registry.mjs`, and let `npm run gate` hold it still. **The lab
 does not read documents; the reader does.**
 
-## The eight
+## The eight, and the engine
 
 | | |
 |---|---|
@@ -41,9 +47,10 @@ does not read documents; the reader does.**
 | [harvest.mjs](harvest.mjs) | pages → byte-identical glyph windows you can call ground truth |
 | [identify.mjs](identify.mjs) | targets → every proven family, then an em64 scan of one face |
 | [sweep.mjs](sweep.mjs) | targets → every (face, em64, pen, law), when nothing known fits |
-| [families.mjs](families.mjs) | the answers so far, as data — and the five blend laws |
+| [families.mjs](families.mjs) | the answers so far, as data — and the blend laws (six names, four distinct maps) |
 | [pgm.mjs](pgm.mjs) | the pixel container, and one definition of ink |
 | [selftest.mjs](selftest.mjs) | `npm run lab:selftest` — the whole loop, on a known answer |
+| [rust/](rust/) | optional: the sweep at 40–45×, the anisotropic probe, the component harvester — with its own gate |
 
 ## What holds it honest
 
@@ -96,22 +103,25 @@ refuted ([METHOD rule 3](../docs/METHOD.md)).
   75–98% of characters, **no certificate**. It is the wrong trade for this
   repo: what it accelerates is approximate matching, and the product here is
   exactness. Where speed genuinely is the wall — the exhaustive sweep, which is
-  hours in JavaScript — the answer is `lab/rust/`, which is 65–100× on the CPU
+  hours in JavaScript — the answer is [rust/](rust/), which is 40–45× on the CPU
   *and* certified against this JS as its oracle. Measured against the prefilter
   it is not even clearly ahead: `mbank scan --profile` over these 17 fixtures
   spends 20% reading and inflating, 32% finding components and 48% matching, so
   a GPU could attack under half the work, and only after a CPU-side inflate had
   already fed it. `--jobs=8` is the cheap version of that win and it is one flag.
-- **A second harvester.** The old repo had four (monospace, connected-component,
-  model-guided, hand-transcribed) writing two different target formats. There is
-  one format here — PGM + `index.json` — and both `identify` and `sweep` read it.
-  The connected-component harvester is the one genuinely missing capability
-  (it needs neither a lattice nor a candidate renderer, so it is the general
-  one); it lands with `lab/rust/`, whose `harvest` subcommand is its fast half.
+- **A second harvester *here*.** The old repo had four (monospace,
+  connected-component, model-guided, hand-transcribed) writing two different
+  target formats. There is one format now — PGM + `index.json` — and
+  everything reads it, including `hunt harvest`, which is the
+  connected-component one and lives in [rust/](rust/) because that is where its
+  speed is. Two harvesters, one format, and neither is a second implementation
+  of the other: `harvest.mjs` cuts a fitted monospace lattice, `hunt harvest`
+  cuts connected ink and needs no lattice at all.
 - **A hunt ledger.** Atomic claim directories and resumable multi-session
   briefs are real machinery, and they exist to make *long* runs survivable. The
-  only run here that is long is the exhaustive sweep, so the ledger belongs with
-  the engine that runs it, not with this.
+  only long run here is the exhaustive sweep, and what actually earned its keep
+  is `hunt sweep --ckpt`: one fsynced line per finished config, so a killed
+  sweep loses at most one.
 - **Findings documents.** Seven of them, and they went stale. A proven family
   is now a row in `families.mjs` citing the *document* that proves it, because
   the document does not go stale and re-reading it is one command.
