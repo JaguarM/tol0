@@ -79,6 +79,33 @@ built with the wrong one silently produces different bundle bytes rather than
 failing. (One of those lists contains an apostrophe, which is also why `--plan`
 does not try to spell them out on a command line.)
 
+#### …and a regenerated legacy set will not match the original bytes
+
+Measured 2026-07-26, and `--plan` now says so on each affected line. Every set
+recorded with `phasesY: '0'` regenerates byte-identically. **No set recorded
+with `phasesY: '0,0.5'` does** — 7 of 7 tried differ, and the difference is
+confined to the ½-phase half: all 684 y-phase-0 rasters of `times16` and all
+428 of `cour13` match bit for bit, and every single ½-phase raster does not.
+
+That is not fontgen misbehaving. Those ½-phase rasters are artifacts of the
+older pipeline, which **rounded pen y to an integer and shifted the result** —
+which is what mupdf itself does (`fillText` at y=28.5 is byte-identical to
+y=29). `fontgen` places a true 1/64 pen, so it renders what a ½-px pen would
+actually look like, and the two disagree by construction.
+
+What it costs was measured on the gate rather than reasoned about. With all 7
+regenerated sets swapped in, **all 18 gate transcripts stay byte-identical
+across 2.44 M glyphs**; the only change is that lines pinned at a ½ phase
+report their baseline 1 px lower, moving 13 coordinate labels in two summaries.
+So: a regenerated set reads the same text, and you should regenerate. What you
+do not get back is the `.npz` bytes — which is why the gate ships its reference
+transcripts rather than trusting anyone's set to be identical.
+
+One thing is measured but *not* explained: `timesilin16` also differs in 82 of
+its 428 y-phase-0 rasters (`timesbdlin16` in 11, `timeslin16` in 6), bounding
+boxes off by a pixel at particular x-phases. No y-rounding story accounts for
+that, and no gate document exercises those glyphs. It is open, not cleared.
+
 ### build — a specific font build, not just a font
 
 9 sets need a *particular* build of a font, and substituting the version you
@@ -88,6 +115,13 @@ have installed will not reproduce them:
   drawings. This is not pedantry; it was the difference between a family reading
   and not reading.
 - **Cambria (Win11 build)**, **`TimesNewRoman8.ttf`**.
+
+`TimesNewRoman8.ttf` is worth singling out, because it shows what this class
+really means: no copy of it exists on the machine this repo was ported on. Its
+two sets (`tnr8lin16`, `tnr8lin10`) survive only as the `.npz` files that were
+generated from it years ago, and the `report` gate document needs them. A
+`build` set whose build you have lost is, in practice, as unreproducible as a
+`corpus` one — the class says what you would need, not that you have it.
 
 The build is part of the proof. This project has hit the same wall from the
 other side with DejaVu Serif: `dejavuserif786` is the right face in a build
@@ -111,7 +145,11 @@ They are only needed by the `calibri` pool.
   `--check` compares it against your own `.npz`, not a committed reference.
 - Most certified family pools need `system`-class sets, so on a fresh clone most
   of them cannot run until you regenerate. `node tools/glyph-sets.mjs --plan`
-  is the todo list.
+  is the todo list. The gate says the same thing document by document: it
+  **skips loudly**, naming the missing set or fixture, and never prints a green
+  line for something it did not read. The 11-document `nimbus791` block is the
+  exception worth knowing about — its pool is entirely free, so it runs on a
+  fresh clone with no system font at all (given the documents).
 - `npm test` asserts every `free` set is present and makes **no** assertion
   about the others — a fresh clone is expected to be missing 62 sets, and that
   must not read as a failure.

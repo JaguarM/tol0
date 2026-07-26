@@ -251,6 +251,7 @@ export const APP_ROSTER = ['times16', 'timesbd16', 'timesi16', 'tnr8_16',
 //             face and byte-compares. Anyone can reproduce these.
 //   'system'  a stock system font (Windows). Not shipped. Regenerate from your
 //             own installed copy: `node tools/glyph-sets.mjs --plan`.
+//             READ `phasesY` BEFORE BELIEVING THAT — see below.
 //   'build'   a SPECIFIC font build that is not the current install — Calibri
 //             1.02 (the installed 6.2x has different drawings), a Win11 Cambria,
 //             a particular Times New Roman. Regenerable only if you have that
@@ -261,6 +262,30 @@ export const APP_ROSTER = ['times16', 'timesbd16', 'timesi16', 'tnr8_16',
 //
 // `chars` is present when the set was generated with a non-default character
 // list; regeneration must pass it verbatim or the bundle bytes differ.
+//
+// `phasesY` IS A REPRODUCIBILITY CLASS, not a detail (measured 2026-07-26,
+// step 4). Every `phasesY: '0'` set regenerates byte-identically. NO
+// `phasesY: '0,0.5'` set does, on any face: 7 of 7 tried differ, and the whole
+// difference is the ½-phase half — all 684 phy-0 rasters of times16 and all
+// 428 of cour13 match bit for bit, all 684/428 phy-1 rasters do not. That is
+// not a bug in fontgen: the corpus-era ½-y rasters were produced by a pipeline
+// that ROUNDED pen y to an integer and shifted the result (mupdf's own
+// behaviour — fillText y=28.5 ≡ y=29), whereas fontgen places a true 1/64 pen.
+// These sets are historical artifacts of a superseded renderer.
+//
+// What it costs is small and was measured on the gate rather than guessed: with
+// all 7 regenerated sets swapped in, all 18 gate transcripts stay BYTE-IDENTICAL
+// across 2.44 M glyphs — the only change is that lines pinned at a ½ phase
+// report their baseline 1 px lower, which moves 13 coordinate labels in two
+// summaries. So a regenerated set reads the same text; it is the .npz bytes and
+// the reported y that are not reproducible. Do not "fix" the gate by
+// regenerating one.
+//
+// OPEN, and deliberately not explained away: `timesilin16` also differs in 82
+// of its 428 phy-0 rasters (`timesbdlin16` in 11, `timeslin16` in 6) — bounding
+// boxes off by a pixel at particular x-phases, which no y-rounding story
+// accounts for. No gate document exercises those glyphs, so this is untested
+// ground, not cleared ground.
 // ---------------------------------------------------------------------------
 export const PROVENANCE = {
   arial16: { src: 'system', font: 'arial.ttf', em64: 1024, phasesY: '0,0.5' },

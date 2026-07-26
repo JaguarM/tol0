@@ -23,7 +23,8 @@ The plan of record and roadmap live in `docs/PLAN.md` (arriving with step 6).
 - [x] **1. ftclone** — the rasterizer clone + font parsers, self-certifying
 - [x] **2. engine** — the reader (bands, matcher, certificate) + unit suite
 - [x] **3. glyph pipeline** — registry · bundle · fontgen, with the licence split
-- [ ] 4. the reader CLI + the byte-identical gate
+- [x] **4. the reader CLI + the byte-identical gate** — 18 documents, 2.44 M
+      glyphs, byte-identical; Chrome dropped
 - [ ] 5. `sync:recto`
 - [ ] 6. docs — the thesis, the pen/blend laws, the methodology
 - [ ] 7. `lab/` — the hunt half (identify · sweep · m-bank)
@@ -38,6 +39,54 @@ npm test                  # engine primitives on synthetic pages (~40 ms)
 ```
 
 Neither needs a PDF, a corpus document, or a system font.
+
+## Reading a document
+
+```bash
+node tools/rasterize-mupdf.mjs --pdf yours.pdf         # fill the raster cache
+node tools/blind-read.mjs --pdf yours.pdf --all --pool nimbus791 --out read.txt
+```
+
+`--pool` names a **certified family read command** — the glyph sets, tolerance
+and blend flags that family was actually proven with, taken from
+`tools/glyph-registry.mjs` so it cannot drift. Reading is not rendering: the
+rasterizer decodes the producer's own embedded page image, because rendering
+the page would invent pixels and there would be nothing left to certify
+against.
+
+Ink the reader cannot explain comes back as `□` with coordinates rather than as
+a guess, which is why a `□` count is a headline number below and not a defect
+to be tuned away.
+
+## The gate
+
+The gate is what makes this repo trustworthy. It re-reads a fixed set of
+documents and byte-compares whole transcripts against committed references:
+**the expected numbers are the files in `fixtures/gate-ref/`, not prose**, so
+any change in any number is the signal.
+
+```bash
+npm run gate
+```
+
+```
+gate: 18/18 ok, 56s total
+```
+
+18 documents · **33,736 lines · 2,436,238 glyphs · 40 □** · 56 s. All 40 □ are
+accounted for and none of them is text: 38 are `nimbusrom`'s red footer legend
+and P1 seal graphic, 2 are in `report`. The 11 `nimbus791` documents also carry
+truth transcripts and match **5,028 of 5,028 rows, spacing included**.
+
+The documents themselves are real government PDFs and are not distributed: they
+live in a gitignored `fixtures/corpus/`, and most pools need glyph sets whose
+faces are not redistributable either. So a fresh clone runs 0 of 18 — and says
+so, per document, naming the missing fixture or set. **Skipping is loud, and it
+is not a pass.** The `nimbus791` block is the cheap way in: its pool is entirely
+free, so those 11 run with no system font at all.
+
+Details, including what the reference has already caught:
+[fixtures/gate-ref/README.md](fixtures/gate-ref/README.md).
 
 ## engine
 
