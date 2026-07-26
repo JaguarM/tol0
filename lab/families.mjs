@@ -124,7 +124,18 @@ export const FAMILIES = [
   { name: 'arial16', renderable: true, font: 'arial.ttf', em64: 1024, fy: [0, 32], gid: 'cmap', law: 'fz', set: 'arial16' },
   { name: 'calibri16', renderable: true, font: 'calibri.ttf', em64: 1024, fy: [0, 32], gid: 'cmap', law: 'fz', set: 'calibri16' },
   { name: 'segoeui16', renderable: true, font: 'segoeui.ttf', em64: 1024, fy: [0, 32], gid: 'cmap', law: 'fz', set: 'segoeui16' },
-  { name: 'verdana16', renderable: true, font: 'verdana.ttf', em64: 1024, fy: [0, 32], gid: 'cmap', law: 'fz', set: 'verdana16' },
+  // Verdana and MS Reference Sans Serif are the SAME PIXELS. Measured
+  // 2026-07-26 through ftclone at em64 1024: 94 printable ASCII × 4 pen phases
+  // = **376 of 376 rasters identical, none differing, neither face missing a
+  // glyph the other has**. So an `m`-bank verdict of `REFSAN` and one of
+  // `verdana` are the same answer, not a disagreement — which is worth knowing
+  // before someone re-opens a hunt because two rosters "named different
+  // faces". A tie of this kind is METHOD rule 6 in its cheapest form: the
+  // faces are indistinguishable from pixels, so pick either and say so.
+  //
+  // NOT a clean read yet — see the `verdana-jitter-partial` note below.
+  { name: 'verdana16', renderable: true, font: 'verdana.ttf', em64: 1024, fy: [0, 32], gid: 'cmap', law: 'fz',
+    set: 'verdana16', record: 'EFTA00688178 — 49/152 cc-harvested targets exact at tol 0, every other family 0' },
   { name: 'georgia16', renderable: true, font: 'georgia.ttf', em64: 1024, fy: [0, 32], gid: 'cmap', law: 'fz', set: 'georgia16' },
 
   // ---- the eDiscovery linear producer (report.pdf) ----
@@ -205,6 +216,10 @@ export const FAMILIES = [
     fingerprint: '816×1073 pages (MediaBox 612×804.75 pt) and a CONTINUOUS pen lattice — zero byte-identical cell repeats, which is the tell that no finite phase set generated them',
     action: 'OPEN. Not matchable by the ¼-px engine as-is; producer AND faces unidentified (the trio mixes g-shapes, so ≥2 faces). Verify face from glyph SHAPES before spending a sweep on it.',
     record: 'open problem' },
+  { name: 'verdana-jitter-partial', renderable: false,
+    fingerprint: 'mode-3 colour fax pages, verdana@1024 (≡ REFSAN.TTF), m-bank exact 40/40 — but the reader leaves ~⅓ of the bands unread',
+    action: 'OPEN, and it is the READ that is open, not the face. tol 0 fails wholesale (2032 □) and tol 1 reads (44 □), which is the registered `jpeg-jitter` law, so the tolerance is justified rather than tuned. What is NOT explained: of 117 ink bands over 3 pages only 80 become lines. Band-picking 853/896 beside 1024 changes nothing (identical 80 lines / 4649 glyphs / 44 □), so the remainder is not a second SIZE — look for a second face, a stamp, or a fax header before widening anything. Do NOT add a glyph-registry pool until a document reads clean; a pool is a proven recipe.',
+    record: 'EFTA00688178 (+ 688175 / 912964 / 434761 / 688877 staged in fixtures/corpus/verdana/)' },
   { name: 'tahoma704-descenders', renderable: false,
     fingerprint: 'Tahoma at em64 704: x-height letters exact at tol 0, but every DESCENDER (g p y and parentheses) fails — "followin[g]", "com[p]lainants", "(2)"',
     action: 'OPEN sub-family, 9 documents. Face and size are certain: ±2..±16 read 0 lines, and neither ½-phase baselines nor tol 1/2/4 recovers one descender, so this is a STRUCTURAL descender-row law, not a size or gray error. Do NOT widen the tahoma pool to chase it.',
