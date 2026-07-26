@@ -116,12 +116,35 @@ have installed will not reproduce them:
   and not reading.
 - **Cambria (Win11 build)**, **`TimesNewRoman8.ttf`**.
 
-`TimesNewRoman8.ttf` is worth singling out, because it shows what this class
-really means: no copy of it exists on the machine this repo was ported on. Its
-two sets (`tnr8lin16`, `tnr8lin10`) survive only as the `.npz` files that were
-generated from it years ago, and the `report` gate document needs them. A
-`build` set whose build you have lost is, in practice, as unreproducible as a
-`corpus` one — the class says what you would need, not that you have it.
+`TimesNewRoman8` is worth singling out, for a reason that is really about
+searching rather than about fonts. It was first written off as lost — "no copy
+on this machine" — because the search was `C:/Windows/Fonts`. Windows also
+installs fonts **per user**, and it was sitting in
+`%LOCALAPPDATA%/Microsoft/Windows/Fonts/TimesNewRoman8_Clean.ttf` the whole
+time. *"No font matches" is a statement about your roster, not about the
+world*; this project has now paid for that lesson twice.
+
+Finding it turned up two errors in the recipe, which is the other half of the
+point — an unreproducible set hides its own bugs:
+
+- `tnr8lin10`'s em64 is **682, not the 683** on record. At 683, 404 of 428
+  y-phase-0 rasters differ from the original; at 682, 30 do.
+- Its advances need the **unquantized** size. `report.pdf`'s body is 8 pt at
+  96 dpi, so the raster matrix truncates to em64 682 while every advance is a
+  multiple of ~10.6666. `fontgen` derived `SIZE_PX = EM64/64` and so could not
+  express that pair at all — every one of the 107 advances came out wrong by up
+  to 0.011 px. `--size` now keeps the size it is given and truncates only the
+  matrix.
+
+With both fixed, all three `tnr8` sets regenerate and `report` reads
+byte-identically from them.
+
+A footnote that says something about `build` as a class: compared against stock
+`C:/Windows/Fonts/times.ttf`, these sets differ in **16 of 856 rasters — the
+characters `<` and `~`, nothing else**, with identical advances. `report`
+contains neither character, so it reads byte-identically from stock Times as
+well. The build genuinely matters; it just happens not to matter *here*, and
+the only way to know which is true is to render both.
 
 The build is part of the proof. This project has hit the same wall from the
 other side with DejaVu Serif: `dejavuserif786` is the right face in a build

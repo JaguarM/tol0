@@ -19,13 +19,49 @@ Recorded 2026-07-26 (step 4 of the port), 18 documents:
 | nimbus791 block (11 docs) | 5,028 | 356,577 | 0 |
 | **total** | **33,736** | **2,436,238** | **40** |
 
-56 s. All 40 □ are accounted for: 2 in `report` and 38 in `nimbusrom` (its red
-footer legend and the P1 seal graphic — non-text ink the reader correctly
-refuses to guess at).
-
-The 11 `nimbus791` documents also carry truth transcripts, and every one of
-them matches **every row, including spacing** — 5,028 of 5,028 rows
+56 s. The 11 `nimbus791` documents also carry truth transcripts, and every one
+of them matches **every row, including spacing** — 5,028 of 5,028 rows
 letter-exact and space-exact, 0 rows differing.
+
+## The 40 □, one by one
+
+A □ is ink the reader refused to guess at, so the count is only meaningful if
+someone has looked at what is under it. Censused from page pixels 2026-07-26.
+**24 of the 40 are ordinary black text** — this is unfinished reading, not
+inherently unreadable ink, and the older record said otherwise (below).
+
+`report` — **2**
+
+- **1 glyph: a `b`** at baseline y313, column 229 (`…1843kb4f‸e4d30c69…`). It
+  reads at `--tol 1` and at no cost elsewhere, so it misses by a single byte.
+  It sits where the preceding `f`'s top hook overhangs the `b`'s stem — the
+  reader accepted that `f` with 3 pixels still pending — so this is the known
+  AA-overlap ±1 at a composite junction, not an unknown glyph.
+- **1 band** at y≈996: an 18-glyph footer of digits in a face the `linear` pool
+  does not contain. Raising tolerance does **not** find it — at `--tol 16` it
+  decays into `"......   . ..'  ..'....."`, which is what a *wrong face* looks
+  like, as opposed to a close one. It needs an identification, not slack.
+
+`nimbusrom` — **38**
+
+| where | □ | what the pixels say |
+|---|---:|---|
+| P1 y131, y152 | 10 | letterhead clusters beside the DOJ seal — genuinely **coloured**: 111–180 of each cluster's ~200 ink px have channel spread up to 117 |
+| P1 bands y158/179/188/948 | 4 | bands containing the seal graphic and the P1 footer. Charged per band, and the band really does contain a graphic — but each also carries ~1,100 px of *neutral* ink surviving colour-whitening (x86–350), i.e. real text rides along |
+| P2–P12 band y982 | 11 | **the correction.** The red legend is there (1,345 coloured px) and is whitened away exactly as designed. What blocks the read is a *separate* **1,276 px of neutral black text**, x96–719, in an unidentified face |
+| P5 y745 | 8 | a bold heading, `3. CLOSE OBSERVATION` — pure neutral ink, channel spread **0** |
+| P10 y830 · P12 y301, y343, y407 | 5 | in-text clusters on ordinary body lines — neutral, spread 0 |
+
+**What this supersedes.** `char_training`'s `ocr/FINDINGS-nimbusrom.md` says
+"every remaining □ being the red footer legend or the P1 seal graphic". That
+holds for the 10 coloured letterhead clusters and is defensible for the 4 P1
+bands, but it is wrong for the other 24: 11 footer bands whose blocking ink is
+neutral rather than red, and 13 in-text clusters the census never mentioned at
+all. Those 24 are unread *text*, and they are the honest next target.
+
+The distinction matters because it changes what to do. Colour and graphics are
+correctly refused and always will be. Neutral unread text means a face is
+missing from the pool — which is a hunt, and a winnable one.
 
 ## Re-recording
 

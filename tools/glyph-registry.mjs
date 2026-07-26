@@ -358,9 +358,20 @@ export const PROVENANCE = {
   timesi16: { src: 'system', font: 'timesi.ttf', em64: 1024, phasesY: '0,0.5' },
   timesilin16: { src: 'system', font: 'timesi.ttf', em64: 1024, phasesY: '0,0.5', linear: true, chars: '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~‘’“”–—…•§¶©ﬁﬂ' },
   timeslin16: { src: 'system', font: 'times.ttf', em64: 1024, phasesY: '0,0.5', linear: true, chars: '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~‘’“”–—…•§¶©ﬁﬂ' },
-  tnr8_16: { src: 'build', font: 'TimesNewRoman8.ttf', em64: 1024, phasesY: '0,0.5', chars: '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~‘’“”–—…•§¶©ﬁﬂ' },
-  tnr8lin10: { src: 'build', font: 'TimesNewRoman8.ttf', em64: 683, phasesY: '0,0.5', linear: true, chars: '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~‘’“”–—…•§¶©ﬁﬂ' },
-  tnr8lin16: { src: 'build', font: 'TimesNewRoman8.ttf', em64: 1024, phasesY: '0,0.5', linear: true, chars: '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~‘’“”–—…•§¶©ﬁﬂ' },
+  tnr8_16: { src: 'build', font: 'TimesNewRoman8_Clean.ttf', em64: 1024, phasesY: '0,0.5', chars: '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~‘’“”–—…•§¶©ﬁﬂ' },
+  // em64 682, NOT the 683 recorded before (measured 2026-07-26: at 683, 404 of
+  // 428 y-phase-0 rasters differ from the legacy set; at 682, 30 do). Its
+  // advances also need the UNQUANTIZED size: report.pdf's body is 8 pt at
+  // 96 dpi, so the raster matrix truncates to 682 while every advance is a
+  // multiple of ~10.6666. `sizePx` carries that (fontgen.mjs).
+  // The value here is 10.667, not 32/3, and that is deliberate — PROVENANCE
+  // records what was ACTUALLY generated, and the legacy generator used the
+  // 3-decimal figure it wrote into the .npz meta. The physically correct size
+  // is 32/3 = 10.6666…; the difference is 0.0003 px per advance, three orders
+  // of magnitude below the ¼-px pen lattice, so it changes no read — but it
+  // does change the bytes, which is the only reason it is pinned.
+  tnr8lin10: { src: 'build', font: 'TimesNewRoman8_Clean.ttf', em64: 682, sizePx: 10.667, phasesY: '0,0.5', linear: true, chars: '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~‘’“”–—…•§¶©ﬁﬂ' },
+  tnr8lin16: { src: 'build', font: 'TimesNewRoman8_Clean.ttf', em64: 1024, phasesY: '0,0.5', linear: true, chars: '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~‘’“”–—…•§¶©ﬁﬂ' },
   verdana16: { src: 'system', font: 'verdana.ttf', em64: 1024, phasesY: '0,0.5', chars: '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~' },
   verdanab16: { src: 'system', font: 'verdanab.ttf', em64: 1024, phasesY: '0,0.5', chars: '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~‘’“”–—…•§¶©ﬁﬂ' },
 };

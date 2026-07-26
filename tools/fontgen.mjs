@@ -18,8 +18,10 @@
 //   node tools/fontgen.mjs --font path/to/face.ttf --size 16   # em64 = 1024
 //
 // --em64 N   : matrix coefficient trunc(em·64) — THE sharp identifier of a
-//              render config (sizePx = N/64). --size S is the convenience
-//              spelling (em64 = trunc(S·64)).
+//              render config (sizePx = N/64).
+// --size S   : the size the producer laid out at, when it is NOT on the 1/64
+//              lattice (8 pt at 96 dpi = 10.6666… px is the case that matters).
+//              Rasters use trunc(S·64); advances use S. See the note below.
 // --phases-y : "0" (integer-baseline producers, e.g. the Outside In / builtin
 //              Courier family) or "0,0.5" (the corpus-era 8-phase layout).
 // ---------------------------------------------------------------------------
@@ -66,11 +68,26 @@ if (SET) {
 
 const FONT = optS('font', null) ?? (PROV?.src === 'free' ? `fonts/${PROV.font}` : null);
 if (!FONT) { console.error('usage: node tools/fontgen.mjs (--set <name> | (--em64 N | --size S)) --font <file> [--out <npz>] [--phases-y 0|0,0.5] [--chars <string>]'); process.exit(1); }
+// EM64 is the RASTER matrix coefficient — trunc(size·64), the quantized thing
+// the renderer actually scales outlines by. SIZE_PX is the size the producer
+// laid text out at, which is what ADVANCES are computed from. For almost every
+// config these are the same number, because the size sits on the 1/64 lattice.
+//
+// They part company when it does not, and that is not a rounding curiosity:
+// report.pdf's body is 8 pt at 96 dpi = 32/3 = 10.6666… px. Its outlines are
+// rasterized at trunc(10.6666·64) = em64 682, but every advance is a multiple
+// of the true 10.6666 — measured against the legacy tnr8lin10 set, deriving
+// the advance size as 682/64 = 10.65625 puts every one of the 107 advances
+// wrong by up to 0.011 px. So --size keeps the size it was given, and only the
+// matrix is truncated. --em64 N still implies N/64, which is exact by
+// construction.
+const SIZE_PX = optS('size', null) !== null ? +optS('size', null)
+  : optS('em64', null) !== null ? +optS('em64', null) / 64
+  : PROV ? (PROV.sizePx ?? PROV.em64 / 64)
+  : (() => { console.error('need --em64, --size or --set'); process.exit(1); })();
 const EM64 = optS('em64', null) !== null ? +optS('em64', null)
   : optS('size', null) !== null ? Math.trunc(+optS('size', null) * 64)
-  : PROV ? PROV.em64
-  : (() => { console.error('need --em64, --size or --set'); process.exit(1); })();
-const SIZE_PX = EM64 / 64;
+  : PROV.em64;
 const PHASES_X = [0, 0.25, 0.5, 0.75];
 const PHASES_Y = optS('phases-y', PROV?.phasesY ?? '0,0.5').split(',').map(Number);
 const CHARS = optS('chars', PROV?.chars ?? DEFAULT_CHARS);

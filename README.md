@@ -73,10 +73,17 @@ npm run gate
 gate: 18/18 ok, 56s total
 ```
 
-18 documents · **33,736 lines · 2,436,238 glyphs · 40 □** · 56 s. All 40 □ are
-accounted for and none of them is text: 38 are `nimbusrom`'s red footer legend
-and P1 seal graphic, 2 are in `report`. The 11 `nimbus791` documents also carry
-truth transcripts and match **5,028 of 5,028 rows, spacing included**.
+18 documents · **33,736 lines · 2,436,238 glyphs · 40 □** · 56 s. The 11
+`nimbus791` documents also carry truth transcripts and match **5,028 of 5,028
+rows, spacing included**.
+
+All 40 □ have been looked at rather than assumed away, and **24 of them are
+ordinary black text** — a face missing from a pool, which is a hunt and a
+winnable one. The rest is colour and graphics, which the reader is right to
+refuse. The census is in
+[fixtures/gate-ref/README.md](fixtures/gate-ref/README.md); it corrects an
+older record that had written all 38 of `nimbusrom`'s off as red legend and
+seal.
 
 The documents themselves are real government PDFs and are not distributed: they
 live in a gitignored `fixtures/corpus/`, and most pools need glyph sets whose
