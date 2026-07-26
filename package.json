@@ -14,9 +14,15 @@
     "glyphs": "node tools/export-glyphs.mjs",
     "glyphs-check": "node tools/export-glyphs.mjs --check",
     "glyph-sets": "node tools/glyph-sets.mjs",
-    "glyph-sets:verify": "node tools/glyph-sets.mjs --verify"
+    "glyph-sets:verify": "node tools/glyph-sets.mjs --verify",
+    "sync:recto": "node tools/sync-recto.mjs",
+    "sync:recto:check": "node tools/sync-recto.mjs --check",
+    "recto-test": "node tools/test-recto-app.mjs"
   },
   "dependencies": {
     "mupdf": "^1.28.0"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^24.0.0"
   }
 }

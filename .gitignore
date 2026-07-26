@@ -18,7 +18,24 @@ gate-out/
 # The authority for what may be committed is PROVENANCE src:'free' in
 # tools/glyph-registry.mjs; npm test asserts every 'free' set is present, so a
 # set that belongs here and is missing fails the suite.
-!assets/fonts/nimbus*.npz
+#
+# Listed one by one, NOT as `nimbus*.npz`: a name-shaped glob decides licence by
+# spelling. Measured 2026-07-26 — populating assets/fonts/ from the old repo's
+# local sets un-ignored four `nimbussans*` npz that PROVENANCE has never
+# classified at all (they are not in SETS). Provenance is the authority, so the
+# exception enumerates exactly what provenance permits.
+!assets/fonts/nimbus_791.npz
+!assets/fonts/nimbusrom_1024.npz
+!assets/fonts/nimbusrombd_1024.npz
+!assets/fonts/nimbusromi_1024.npz
+!assets/fonts/nimbusromg35_1024.npz
+!assets/fonts/nimbusromlin_1024.npz
+!assets/fonts/nimbusromlin_983.npz
+!assets/fonts/nimbusrombdlin_1024.npz
+!assets/fonts/nimbusrombdlin_1194.npz
+!assets/fonts/nimbusromilin_1024.npz
+!assets/fonts/nimbussansbdlin_1536.npz
+!assets/fonts/nimbussansg118_1024.npz
 !assets/fonts/dejavuserif_786.npz
 
 # glyphs.bin bundles whatever sets you have locally, so it is per-machine and

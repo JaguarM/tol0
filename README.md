@@ -25,7 +25,7 @@ The plan of record and roadmap live in `docs/PLAN.md` (arriving with step 6).
 - [x] **3. glyph pipeline** — registry · bundle · fontgen, with the licence split
 - [x] **4. the reader CLI + the byte-identical gate** — 18 documents, 2.44 M
       glyphs, byte-identical; Chrome dropped
-- [ ] 5. `sync:recto`
+- [x] **5. `sync:recto`** — this repo is now the source of the engine Recto runs
 - [ ] 6. docs — the thesis, the pen/blend laws, the methodology
 - [ ] 7. `lab/` — the hunt half (identify · sweep · m-bank)
 - [ ] 8. `lab/rust/` — the fast sweep engine
@@ -94,6 +94,40 @@ free, so those 11 run with no system font at all.
 
 Details, including what the reference has already caught:
 [fixtures/gate-ref/README.md](fixtures/gate-ref/README.md).
+
+## Recto — the same bytes, in a browser
+
+[Recto](../Recto) is a Django PDF editor whose `ocr_tool` plugin runs this
+engine client-side. It does not have a copy of the engine; it has *these* files,
+pushed by:
+
+```bash
+npm run sync:recto           # -> ../Recto/ocr_tool (default; --recto <path>)
+npm run sync:recto:check     # report stale, write nothing, exit 1 if stale
+npm run recto-test           # end-to-end: Django + headless Chrome + a real upload
+```
+
+The direction is the whole point. The engine is developed **only here**, where
+the gate can certify it, and Recto's copies are verbatim and never hand-edited
+there — so a read in the browser is the read the gate proved. `--check` is what
+makes that claim auditable: it byte-compares and exits non-zero, so drift is
+caught rather than assumed absent. Engine cache-busters in `tool.py` are
+rewritten to a content hash, so a browser refetches exactly when a file changed.
+
+`recto-test` uploads a **gate document** through the real file input
+(`fixtures/corpus/nimbus791/EFTA00751637.pdf`) and drives the real buttons,
+because a programmatic call would mask dead UI wiring — that bug has happened.
+It is the one thing here that still needs a headless browser, which is why
+`puppeteer-core` is a **devDependency**; the reader, the rasterizer and the gate
+have no browser dependency at all.
+
+**Syncing an incomplete `glyphs.bin` is refused.** The bundle contains whatever
+`.npz` you have locally, so a fresh clone builds one with 13 of 75 sets —
+pushing that would swap Recto's dictionary for a smaller one with no error and
+no crash, just a reader that quietly stops recognizing faces. The gate cannot
+catch it either, because the gate reads through *named pools*, not the whole
+bundle. So the sync names the missing sets and stops (`--allow-partial` if you
+really mean it).
 
 ## engine
 
