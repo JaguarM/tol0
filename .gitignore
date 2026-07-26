@@ -52,3 +52,19 @@ assets/glyphs/
 *.cff
 *.pfb
 !fonts/**
+
+# --- the lab ---------------------------------------------------------------
+# Everything the lab writes is either corpus pixels or derived from them.
+# lab/pages/ and lab/targets/ are literally slices of documents that are not
+# distributed, so they carry the corpus rule, not the "generated data" rule.
+lab/pages/
+lab/targets/
+lab/*.json
+!lab/package.json
+# The m bank is 9 MB of rasters of every font ON THIS MACHINE — per-machine by
+# construction, and derivative of those faces. Rebuild it: node lab/mbank.mjs build
+lab/m-bank.json
+# Extracted TTC subfonts. Already covered by the *.ttf rule above; named here
+# because this is the exact shape of the mistake that put 431 MB of Microsoft
+# CJK binaries into the old repo's history.
+lab/.fontcache/

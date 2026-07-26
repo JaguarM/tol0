@@ -168,3 +168,28 @@ test('glyph registry: rosters, pools and npz manifest agree',
   assert.deepStrictEqual(appSets, APP_ROSTER,
     'engine/blindocr.js DEFAULT_SETS drifted from registry APP_ROSTER');
 });
+
+// ---------------------------------------------------------------------------
+// The lab boundary. `ftclone/` is a top-level package precisely so that both
+// halves of the repo can use it without either importing the other: the reader
+// must never depend on hunt tooling, and hunt tooling must never be pinned by
+// the reader's refactors. That rule was aspirational in the old repo — where
+// tools/fontgen.mjs imported ../ocr/tools/ftclone.mjs — so assert it here
+// rather than write it down.
+// ---------------------------------------------------------------------------
+test('no root <-> lab imports', () => {
+  const { readdirSync } = require('node:fs');
+  const files = f => { try { return readdirSync(join(REPO, f)); } catch { return []; } };
+  const src = (dir, f) => readFileSync(join(REPO, dir, f), 'utf8');
+
+  for (const f of files('lab').filter(f => f.endsWith('.mjs')))
+    for (const [, spec] of src('lab', f).matchAll(/\bfrom\s+'([^']+)'/g))
+      assert.ok(!/^\.\.\/(tools|engine|test)\//.test(spec),
+        `lab/${f} imports "${spec}" — the lab may only reach into ftclone/`);
+
+  for (const dir of ['tools', 'engine', 'ftclone'])
+    for (const f of files(dir).filter(f => /\.(mjs|js)$/.test(f)))
+      for (const [, spec] of src(dir, f).matchAll(/\bfrom\s+'([^']+)'|\brequire\('([^']+)'\)/g))
+        assert.ok(!/(^|\/)lab\//.test(spec ?? ''),
+          `${dir}/${f} imports "${spec}" — the reader must not depend on the lab`);
+});

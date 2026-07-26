@@ -17,7 +17,8 @@
     "glyph-sets:verify": "node tools/glyph-sets.mjs --verify",
     "sync:recto": "node tools/sync-recto.mjs",
     "sync:recto:check": "node tools/sync-recto.mjs --check",
-    "recto-test": "node tools/test-recto-app.mjs"
+    "recto-test": "node tools/test-recto-app.mjs",
+    "lab:selftest": "node lab/selftest.mjs"
   },
   "dependencies": {
     "mupdf": "^1.28.0"

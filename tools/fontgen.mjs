@@ -108,7 +108,7 @@ const OUT = resolve(REPO, optS('out', PROV ? `assets/fonts/${PROV.npz}`
 const fontPath = resolve(REPO, FONT);
 
 // mupdf is a plain dependency of this repo, so the old hand-rolled resolver
-// (which walked ocr/node_modules to keep the previous repo's root
+// (which walked the lab's own node_modules to keep the previous repo's root
 // dependency-free) collapses to the import at the top of this file.
 const mfont = new mupdf.Font('F', readFileSync(fontPath));
 
@@ -217,6 +217,11 @@ function writeZip(path, entries) {            // entries: [name, Buffer][]
 const meta = {
   fontfile: FONT.replace(/\\/g, '/'), size_px: SIZE_PX, chars: CHARS,
   phases_x: PHASES_X, phases_y: PHASES_Y,
+  // DO NOT TIDY THIS STRING. It is written into every .npz, so changing one
+  // character changes the bytes of every regenerated set and breaks the
+  // byte-identity `npm run glyph-sets:verify` asserts against the 13 committed
+  // ones. The dangling `ocr/FINDINGS.md` is a fossil of the previous repo
+  // (that record is now lab/families.mjs `nimbus791`) and it stays a fossil.
   pipeline: `ftclone em64 ${EM64} unhinted-ft ftgrays single-draw (certified vs mupdf-wasm; ocr/FINDINGS.md)`
     + (LINEAR ? ' linear-remap' : '') + (INK !== null ? ` srcover-ink-${INK}` : ''),
 };

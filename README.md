@@ -23,6 +23,7 @@ tuple from pixels alone.
 | [docs/METHOD.md](docs/METHOD.md) | how this kind of problem is worked: eight rules that cost real time |
 | [docs/FONTS.md](docs/FONTS.md) | what ships, what you regenerate, and why a fresh clone has 13 of 75 glyph sets |
 | [fixtures/gate-ref/README.md](fixtures/gate-ref/README.md) | the gate's expected numbers, and all 40 □ looked at one by one |
+| [lab/README.md](lab/README.md) | the other half — finding the producer of a document nobody has read yet |
 
 ## What runs with nothing installed
 
@@ -148,10 +149,15 @@ ftclone/    the rasterizer clone + font parsers — the certified core, self-cer
 engine/     the DOM-free matcher: ink bands, baseline pin, the composite-aware
             scan, object/redaction detection, the per-line certificate
 tools/      fontgen · glyph registry/bundle · rasterizer · reader CLI · gate · sync
+lab/        the other half: what produced these pixels? (see lab/README.md)
 fixtures/   gate documents (gitignored) + the reference transcripts
 fonts/      the source faces this repo may legally ship
 docs/       the laws, the method, the font/licence story
 ```
+
+`ftclone/` is a top-level package rather than a detail of either half, and that
+is load-bearing: `tools/` and `lab/` both need it, and neither may import the
+other. `npm test` asserts that boundary instead of describing it.
 
 `engine/` is shared verbatim by the CLI and the browser app, so the scanning
 physics has exactly one implementation; `test/engine.test.js` covers it on
@@ -169,7 +175,9 @@ Ported from a larger private working repo, one certified layer at a time.
       Chrome dropped
 - [x] **5. `sync:recto`** — this repo is now the source of the engine Recto runs
 - [x] **6. docs** — the laws, the method, one worked example
-- [ ] 7. `lab/` — the hunt half: identify · sweep · m-bank · families
+- [x] **7. `lab/`** — the hunt half in 8 files, with its own end-to-end gate:
+      a gate document is re-identified blind, 93/107 targets, every other
+      family flat zero
 - [ ] 8. `lab/rust/` — the fast sweep engine, with its own certify gate
 
 Open, and known: a **synthetic gate** (a page whose transcript is known, built
