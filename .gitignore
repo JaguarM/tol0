@@ -1,0 +1,28 @@
+node_modules/
+
+# --- the corpus: real documents. Never committed, in any form. -------------
+fixtures/corpus/
+*.pdf
+
+# --- derived caches --------------------------------------------------------
+**/raster-cache/
+*.gray.gz
+gate-out/
+
+# --- derived glyph sets ----------------------------------------------------
+# .npz files are rasterized bitmaps OF A FACE, so they inherit that face's
+# licence — they are not merely "generated data". Regenerate locally with
+# fontgen; only sets derived from OFL/URW faces may be force-added.
+*.npz
+assets/glyphs/
+
+# --- font binaries ---------------------------------------------------------
+# Reference system fonts by path; never ship them. The previous repo committed
+# 431 MB of Microsoft CJK TTFs before adding this rule, and gitignoring a path
+# does not untrack it — hence the blanket ignore plus one narrow exception.
+*.ttf
+*.ttc
+*.otf
+*.cff
+*.pfb
+!ftclone/fonts/**
