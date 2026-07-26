@@ -11,9 +11,18 @@ gate-out/
 
 # --- derived glyph sets ----------------------------------------------------
 # .npz files are rasterized bitmaps OF A FACE, so they inherit that face's
-# licence — they are not merely "generated data". Regenerate locally with
-# fontgen; only sets derived from OFL/URW faces may be force-added.
+# licence — they are not merely "generated data". Regenerate locally:
+#   node tools/glyph-sets.mjs --plan
 *.npz
+# ...except the 13 sets whose face is redistributable and ships in fonts/.
+# The authority for what may be committed is PROVENANCE src:'free' in
+# tools/glyph-registry.mjs; npm test asserts every 'free' set is present, so a
+# set that belongs here and is missing fails the suite.
+!assets/fonts/nimbus*.npz
+!assets/fonts/dejavuserif_786.npz
+
+# glyphs.bin bundles whatever sets you have locally, so it is per-machine and
+# derived — build it with: node tools/export-glyphs.mjs
 assets/glyphs/
 
 # --- font binaries ---------------------------------------------------------
@@ -25,4 +34,4 @@ assets/glyphs/
 *.otf
 *.cff
 *.pfb
-!ftclone/fonts/**
+!fonts/**

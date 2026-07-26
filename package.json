@@ -7,9 +7,13 @@
   "scripts": {
     "test": "node test/test.js && node test/engine.test.js",
     "test:engine": "node test/engine.test.js",
-    "certify:ftclone": "node ftclone/certify.mjs"
+    "certify:ftclone": "node ftclone/certify.mjs",
+    "glyphs": "node tools/export-glyphs.mjs",
+    "glyphs-check": "node tools/export-glyphs.mjs --check",
+    "glyph-sets": "node tools/glyph-sets.mjs",
+    "glyph-sets:verify": "node tools/glyph-sets.mjs --verify"
   },
-  "devDependencies": {
+  "dependencies": {
     "mupdf": "^1.28.0"
   }
 }

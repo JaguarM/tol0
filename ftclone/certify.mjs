@@ -12,7 +12,7 @@
 //   TTF — clone(Carlito-Regular.ttf) vs fillText(mupdf.Font from the same bytes)
 //   CFF — clone(NimbusMonoPS-Regular.cff) vs fillText(mupdf's BUILTIN 'Courier'),
 //         which IS URW Nimbus Mono PS — so this also certifies that the file in
-//         ftclone/fonts/ is the same font mupdf embeds.
+//         fonts/ is the same font mupdf embeds.
 //
 // Both fonts are redistributable (Carlito = SIL OFL, Nimbus = URW/AFPL with the
 // font exception) — see fonts/LICENSES.md. The cert deliberately depends on NO
@@ -33,7 +33,7 @@ import { FTClone } from './ftclone.mjs';
 import * as mupdf from 'mupdf';
 
 const HERE = new URL('.', import.meta.url);
-const fontPath = (n) => new URL(`fonts/${n}`, HERE).pathname.replace(/^\/([A-Za-z]:)/, '$1');
+const fontPath = (n) => new URL(`../fonts/${n}`, HERE).pathname.replace(/^\/([A-Za-z]:)/, '$1');
 
 // printable ASCII, minus space (no ink). No corpus dependency: this list is
 // the alphabet, not a harvest.

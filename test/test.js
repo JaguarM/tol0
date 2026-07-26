@@ -77,7 +77,7 @@ test('gray maps a known RGBA buffer to the expected grayscale values', () => {
 // ---------------------------------------------------------------------------
 // Registry drift net (tools/glyph-registry.mjs is THE source of truth for
 // sets/pools/rosters). The browser app cannot import Node modules, so its
-// DEFAULT_SETS is a literal in src/blindocr.js — this test fails the moment
+// DEFAULT_SETS is a literal in engine/blindocr.js — this test fails the moment
 // the two lists (or a pool's set names, or the npz manifest) drift.
 // ---------------------------------------------------------------------------
 
@@ -120,25 +120,35 @@ test('DEFAULT_SETS parser ignores comments inside the literal', () => {
   assert.strictEqual(parseDefaultSets('const OTHER = [];'), null);
 });
 
-// Skips until step 3 lands tools/glyph-registry.mjs. Deliberately a skip and
-// not a deletion: the drift net must switch itself on the moment the registry
-// exists, rather than waiting to be remembered.
+// The registry landed in step 3, so this is live. The guard stays: it costs a
+// line and keeps the suite runnable if the registry is ever absent.
 const REGISTRY = require('node:path').join(__dirname, '..', 'tools', 'glyph-registry.mjs');
 const noRegistry = !require('node:fs').existsSync(REGISTRY);
 
 test('glyph registry: rosters, pools and npz manifest agree',
-  { skip: noRegistry && 'tools/glyph-registry.mjs not ported yet (roadmap step 3)' },
+  { skip: noRegistry && 'tools/glyph-registry.mjs absent' },
   async () => {
   const { readFileSync, existsSync } = require('node:fs');
   const { join } = require('node:path');
   const REPO = join(__dirname, '..');
-  const { SETS, POOLS, BATCH_LADDER, APP_ROSTER, poolSetNames } =
+  const { SETS, POOLS, BATCH_LADDER, APP_ROSTER, PROVENANCE, poolSetNames } =
     await import('../tools/glyph-registry.mjs');
   const names = new Set(SETS.map(([n]) => n));
 
-  // every npz the manifest names is committed
+  // every set records where its pixels came from
+  for (const [n] of SETS)
+    assert.ok(PROVENANCE[n], `${n}: no PROVENANCE entry — record its source before adding it`);
+  for (const n of Object.keys(PROVENANCE))
+    assert.ok(names.has(n), `PROVENANCE has "${n}" but SETS does not`);
+
+  // Only the 'free' class may be committed (a .npz inherits its face's
+  // licence). Assert exactly that: every free set present, and no assertion at
+  // all about the rest — those are regenerated locally from your own fonts and
+  // are legitimately absent on a fresh clone.
   for (const [n, npz] of SETS)
-    assert.ok(existsSync(join(REPO, 'assets', 'fonts', npz)), `${n}: assets/fonts/${npz} missing`);
+    if (PROVENANCE[n].src === 'free')
+      assert.ok(existsSync(join(REPO, 'assets', 'fonts', npz)),
+        `${n}: assets/fonts/${npz} missing — 'free' sets ship with the repo`);
 
   // every pool references only known sets; ladder references only known pools
   for (const [pn, pool] of Object.entries(POOLS))
@@ -152,9 +162,9 @@ test('glyph registry: rosters, pools and npz manifest agree',
     assert.ok(names.has(s), `APP_ROSTER: unknown set "${s}"`);
 
   // the app's literal DEFAULT_SETS must equal APP_ROSTER exactly
-  const src = readFileSync(join(REPO, 'src', 'blindocr.js'), 'utf8');
+  const src = readFileSync(join(REPO, 'engine', 'blindocr.js'), 'utf8');
   const appSets = parseDefaultSets(src);
-  assert.ok(appSets, 'DEFAULT_SETS literal not found in src/blindocr.js');
+  assert.ok(appSets, 'DEFAULT_SETS literal not found in engine/blindocr.js');
   assert.deepStrictEqual(appSets, APP_ROSTER,
-    'src/blindocr.js DEFAULT_SETS drifted from registry APP_ROSTER');
+    'engine/blindocr.js DEFAULT_SETS drifted from registry APP_ROSTER');
 });
