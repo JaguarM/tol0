@@ -21,13 +21,36 @@ Ported from a larger private working repo, one certified layer at a time.
 The plan of record and roadmap live in `docs/PLAN.md` (arriving with step 6).
 
 - [x] **1. ftclone** — the rasterizer clone + font parsers, self-certifying
-- [ ] 2. engine — the reader (bands, matcher, certificate)
+- [x] **2. engine** — the reader (bands, matcher, certificate) + unit suite
 - [ ] 3. glyph pipeline — registry · bundle · fontgen
 - [ ] 4. the reader CLI + the byte-identical gate
 - [ ] 5. `sync:recto`
 - [ ] 6. docs — the thesis, the pen/blend laws, the methodology
 - [ ] 7. `lab/` — the hunt half (identify · sweep · m-bank)
 - [ ] 8. `lab/rust/` — the fast sweep engine
+
+## Running what exists
+
+```bash
+npm install
+npm run certify:ftclone   # the rasterizer clone vs the real mupdf
+npm test                  # engine primitives on synthetic pages (~40 ms)
+```
+
+Neither needs a PDF, a corpus document, or a system font.
+
+## engine
+
+`engine/` is the DOM-free matcher core — ink bands, baseline pinning, the
+left→right composite-aware scan, object/redaction detection, and the per-line
+certificate. It is shared verbatim by the Node CLI and the browser app, so the
+scanning physics has exactly one implementation.
+
+`test/engine.test.js` covers that physics on **synthetic** pages only: band
+finding, object detection (rules, redaction boxes, stacked boxes), `scanLine`
+(byte-exact read, the honest `□` on unknown ink, blend-law overlap, tolerance,
+palette quantization), space calibration, and `readPage` end-to-end. 27 tests,
+~40 ms, no assets — which is why they run before the slow document gate.
 
 ## ftclone
 
