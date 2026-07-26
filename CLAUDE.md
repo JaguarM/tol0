@@ -38,13 +38,14 @@ run instead of asserting the number someone wrote down.
 
 ## The gates
 
-All of these must be green when you finish. The first three need nothing
-installed but Node; the rest need documents or fonts this repo cannot ship, and
-they **skip loudly** rather than passing.
+All of these must be green when you finish. The first four need nothing
+installed but Node (`rust:certify` also wants cargo); the rest need documents or
+fonts this repo cannot ship, and they **skip loudly** rather than passing.
 
 ```bash
 npm run certify:ftclone   # CERTIFIED TTF + CFF, 0 diffs over 1128 renders each
 npm test                  # 6 pass + 27 pass, ~45 ms
+npm run gate:synth        # SYNTHETIC GATE CERTIFIED, 19 assertions, ~1.2 s
 npm run rust:certify      # 13 assertions, ~2.4 s   (after: npm run rust:build)
 
 npm run glyph-sets:verify # 13 shipped sets reproduce byte-identically

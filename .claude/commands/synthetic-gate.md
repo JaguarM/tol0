@@ -1,59 +1,60 @@
 ---
-description: The open design task — a page whose transcript is known, built with no corpus pixels
+description: The reader's corpus-free gate — how it is built, and what it still does not prove
 ---
 
-This is the repo's one substantial open piece of design, and the only thing
-stopping a stranger from running the reader at all.
+**This one is built.** `npm run gate:synth` runs the reader end to end on a page
+this repo draws for itself, in ~1.2 s, with no corpus, no PDF and no system
+font. It closed the hole that a stranger could certify the rasterizer, the
+engine primitives and the lab's fast engine but could not run the **reader** at
+all.
 
-## The state of it
+Everything about it lives in one place: the header comment of
+[tools/synth-gate.mjs](../../tools/synth-gate.mjs). Read that before changing
+anything here.
 
-Three gates already run on a fresh clone with no corpus and no system font,
-because their inputs are **drawn** rather than harvested:
+## What it does, in one paragraph
 
-- `npm run certify:ftclone` — renders through mupdf and through `ftclone/`, and
-  compares; the codepoint list is a literal and the faces are in `fonts/`.
-- `npm test` — synthetic pages built in the test file itself.
-- `npm run rust:certify` — control targets and a whole harvest page drawn by
-  `ftclone/`, then read back. **Look at `lab/rust/certify.mjs` first**: it is
-  the nearest thing to a worked example, and its harvest page (a real PGM with
-  a real `words.json` overlay, laid out at a fixed advance) is roughly a third
-  of what this task needs.
+It lays a page out at **fractional** pens by accumulating each face's own
+advances, then places every glyph through the measured lattice law
+(`docs/LAWS.md` §1 — x snapped to ¼ px, y rounded to an integer) and composites
+left→right through the blend law (§2), so overlapping pairs are real composites.
+Faces are the free ones in `fonts/`, drawn with `ftclone/`, read back with the
+five committed sets those faces produce. The reader is then handed the page and
+the pool and nothing else, through the real CLI. Nineteen assertions; the
+load-bearing ones are:
 
-`npm run gate` is the one that cannot: all 18 documents are real government
-PDFs, `fixtures/corpus/` is gitignored, and most pools need glyph sets whose
-faces are not redistributable. A fresh clone runs **0 of 18** and says so per
-document.
+- **every recovered pen equals the drawn pen**, to a quarter pixel (397 of them,
+  all four phases) — a transcript can be right for the wrong reason, a pen list
+  cannot;
+- the whole transcript letter- *and* space-exact against a truth file that is
+  the layout itself;
+- every baseline, including a line laid on a **½-px baseline** that §1 rounds one
+  row down;
+- **the certificate in the other direction**: one solid 8×11 mark that is not
+  text and not an object must come back as exactly one `□` with coordinates, and
+  must not cost a single text line;
+- **the decoy**: read again with a pool that cannot explain the 16-px body, and
+  not one row of it may come back — the reader half of the rule
+  `lab:selftest` and `rust:certify` lean on.
 
-## What has to be built
+The committed reference is `fixtures/synth-ref/` — transcript, summary, and the
+**sha256 of the drawn page**, so a change in the drawing is as loud as a change
+in the read. Re-record with `--regen`, deliberately.
 
-A page whose transcript is known by construction, exercising what the reader
-actually does — not just glyph rendering:
+## What it still does not prove — do not let this drift
 
-1. **ink bands** — several lines with realistic leading, including two that
-   nearly touch, since band splitting on blank rows is the first thing that can
-   go wrong;
-2. **baseline pin** — at least one line on a ½-px baseline, because the reader
-   tries integer *and* ½-px y-phase and the wrong pin is a silent whole-line
-   failure;
-3. **word spacing** — gaps the reader must self-calibrate from the histogram
-   rather than be told (`docs/LAWS.md`, and the 7.4077 px example in README);
-4. **a non-text object** — a rule or a filled box, so object detection is
-   exercised and the □ accounting means something;
-5. **the certificate** — `"fails": 0` on every band, and a truth file the read
-   is diffed against, letter- and space-exact.
+The page is drawn by the same rasterizer clone the reader matches with. That
+makes it evidence about the reader's *machinery* (banding, the baseline pin, the
+composite-aware scan, object detection, space calibration, the certificate, the
+□ accounting) and **no evidence at all about a real producer**. `npm run gate`
+remains the authority there, and neither substitutes for the other.
 
-Then it becomes a `npm run gate`-shaped check that needs no fixtures.
+Deliberately out of scope, because inventing a producer for them would prove
+nothing: the **linear post-law** and **palette quantization** (§4), both
+corpus-only. The page is also cleaner than any real one — no JPEG jitter, no
+whitened colour, no redaction spill, and its word gaps are one width for the
+whole page (see the note in the file: `spaceCalib` returns ONE space advance per
+page, so mixed-family spacing is a known limit, not a target).
 
-## The rules that constrain it
-
-- **Draw with `ftclone/` and the faces in `fonts/`.** Anything else
-  reintroduces the corpus or a system-font dependency, which is the regression
-  this whole task exists to remove.
-- **The reader must not be told anything the real reader is not told.** No
-  layout constants, no baseline hints, no advance table. If the synthetic page
-  is easier than a real one, it proves less than the gate it is standing in for
-  — say so plainly rather than claiming parity.
-- **It does not replace the corpus gate.** Both run; the corpus gate stays the
-  authority on real producers. Keep `fixtures/gate-ref/` exactly as it is.
-
-Finish with the gates green and a commit.
+If you extend the page, extend it toward something a real document does that the
+gate cannot currently see — and keep `fixtures/gate-ref/` untouched.

@@ -1222,6 +1222,15 @@
   }
 
   // ---- spaces from measured gaps ----
+  // ONE space advance per page, over every line's gaps. Measured 2026-07-26 on
+  // the synthetic gate's page (tools/synth-gate.mjs): a page whose faces have
+  // DIFFERENT space advances transcribes the wider ones as multiples — 16-px
+  // Nimbus Roman (space 4.0 px) and 12.36-px Courier (7.41 px) on one page
+  // calibrate to 3.98 and the Courier lines come back "Received:  by  10.229…".
+  // Not a defect to patch blind: the cluster is what makes narrow styled spaces
+  // measurements instead of errors, and every gate document that carries a
+  // truth file is single-family. It is a limit to know before certifying
+  // spacing on a mixed-family page.
   function spaceCalib(lines) {
     // gaps between consecutive glyphs, minus advance: cluster the positive ones
     const gaps = [];

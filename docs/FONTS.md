@@ -48,7 +48,10 @@ actually reads — rather than asking you to take it on trust. It runs the same
 recipe `--plan` prints, so what is verified is the documented path.
 
 Two certified pools (`nimbus791`, `nimbusromCourt`) are entirely free, so they
-work on a fresh clone.
+work on a fresh clone. Five of the 13 — `nimbusrom1024`, `nimbusrombd1024`,
+`nimbusromi1024`, `nimbus791`, `dejavuserif786` — are also what makes the
+synthetic reader gate (`npm run gate:synth`) runnable with nothing installed:
+their faces draw its page and the same sets read it back.
 
 ### system — regenerate from your own fonts
 

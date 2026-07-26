@@ -31,6 +31,7 @@ tuple from pixels alone.
 npm install
 npm run certify:ftclone   # the rasterizer clone vs the real mupdf
 npm test                  # engine primitives on synthetic pages (~40 ms)
+npm run gate:synth        # the READER, on a page this repo draws (~1 s)
 npm run rust:build && npm run rust:certify   # the lab's fast engine (needs cargo)
 ```
 
@@ -39,6 +40,8 @@ pen lattice, measured now: x 5 distinct rasters per px (4 phases of 1/4 px + the
 
 CERTIFIED TTF y-phase  0/64 — 0 diffs over 1128 renders
 CERTIFIED CFF y-phase  0/64 — 0 diffs over 1128 renders
+
+SYNTHETIC GATE CERTIFIED: 12 lines, 397 pens and every baseline recovered, 0 □ on the text and 1 on the ink that is not text
 ```
 
 None of those needs a PDF, a corpus document, or a system font — a deliberate
@@ -46,9 +49,21 @@ constraint, not a convenience. `ftclone/` is a JS port of the glyph pipeline
 inside **mupdf 1.28 wasm** (FreeType 2.13 smooth rasterizer, integer 26.6
 throughout); everything else depends on it, so it certifies itself against the
 real thing, in two pipelines that share almost no code below the outline. The
-third line holds the same line one level further out: `lab/rust/` is a port of
+last line holds the same line one level further out: `lab/rust/` is a port of
 *that* port, and it proves itself against it over 3,000 seeded tuples and two
 whole control sweeps drawn from the faces this repo ships.
+
+The third is the **synthetic reader gate** ([tools/synth-gate.mjs](tools/synth-gate.mjs)):
+one page laid out at fractional pens, placed through the measured lattice law
+(¼-px x, integer y) and composited through the blend law, then read back by the
+real CLI which is told nothing but the pool. It asserts the whole transcript
+letter- and space-exact, **all 397 pens to a quarter pixel**, every baseline
+(including a line laid on a ½-px baseline, which §1 rounds one row down), the
+rule and the redaction box, the self-calibrated space advance — and, in the
+other direction, that the one piece of ink that is *not* text comes back as an
+honest `□` while a decoy pool transcribes nothing it cannot explain. It proves
+the reader's *machinery* against arithmetic, not any real producer: that is what
+the corpus gate below is for, and neither substitutes for the other.
 
 ## A read, end to end
 
@@ -118,7 +133,9 @@ The documents are real government PDFs and are not distributed (gitignored
 `fixtures/corpus/`), and most pools need glyph sets whose faces are not
 redistributable either — so a fresh clone runs 0 of 18, and says so per document,
 naming the missing fixture or set. **Skipping is loud, and it is not a pass.**
-The `nimbus791` block is the cheap way in: its pool is entirely free.
+The `nimbus791` block is the cheap way in: its pool is entirely free. What a
+clone *can* run in full is `npm run gate:synth`, above — the reader on a page
+this repo draws for itself.
 
 ## Recto — the same bytes, in a browser
 
@@ -186,10 +203,13 @@ Ported from a larger private working repo, one certified layer at a time.
 - [x] **8. `lab/rust/`** — the sweep at 40–45×, the anisotropic probe and the
       connected-component harvester, certified against the JS as its oracle
       and running that gate **with no corpus at all**
+- [x] **9. the synthetic reader gate** — a whole page whose transcript is known
+      by construction, so the reader itself runs on a fresh clone: 12 lines,
+      397 pens recovered to the ¼ px, one honest `□`
 
-Open, and known: the **reader's** gate still needs documents that cannot be
-shipped, so a stranger can run `certify:ftclone`, `test` and `rust:certify` but
-0 of 18 gate documents; the synthetic half of that problem is solved for the
-rasterizer and the lab, not yet for a whole page whose transcript is known.
-Also unsettled: whether `ftclone` still certifies against a *different* mupdf
-build — i.e. what exactly the compatibility claim is.
+Open, and known: the synthetic gate stands in for the corpus gate's
+*reachability*, not for its evidence — the linear post-law and palette
+quantization (§4) are still exercised only by documents that cannot be shipped,
+and the page it draws is cleaner than a real one (no JPEG jitter, no colour, no
+redaction spill). Also unsettled: whether `ftclone` still certifies against a
+*different* mupdf build — i.e. what exactly the compatibility claim is.

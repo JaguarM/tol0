@@ -8,6 +8,7 @@ rather than after a minute of gate:
 ```bash
 npm run certify:ftclone   # CERTIFIED TTF + CFF, 0 diffs over 1128 renders each
 npm test                  # 6 pass + 27 pass, ~45 ms
+npm run gate:synth        # SYNTHETIC GATE CERTIFIED, 19 assertions, ~1.2 s
 npm run rust:certify      # 13 assertions, ~2.4 s   (needs: npm run rust:build)
 npm run glyph-sets:verify # 13 shipped sets reproduce byte-identically
 npm run glyphs-check      # glyphs.bin ⇔ 75 npz sets

@@ -1,0 +1,13 @@
+SYNTHETIC PAGE
+This page was drawn by tools/synth-gate.mjs; it never
+existed as a document.  Its transcript is known.
+The reader is told nothing about this layout.
+Pen y has no subpixel: 133.5 draws at 134.
+These two lines nearly touch,
+and one blank row separates them.
+Received: by 10.229.235.4 with SMTP id ke4mr685;
+a second face, monospaced, at 12.359375 px.
+DejaVu Serif 786 is the TTF pipeline on this page.
+PAYMENT schedule follows.
+Ligatures are one glyph: final, flow.
+

@@ -9,6 +9,7 @@
     "test:engine": "node test/engine.test.js",
     "certify:ftclone": "node ftclone/certify.mjs",
     "gate": "node tools/gate.mjs",
+    "gate:synth": "node tools/synth-gate.mjs",
     "read": "node tools/blind-read.mjs",
     "rasterize": "node tools/rasterize-mupdf.mjs",
     "glyphs": "node tools/export-glyphs.mjs",
