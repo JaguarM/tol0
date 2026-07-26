@@ -15,22 +15,16 @@ To read a document this way you must first know its **(face, size, pen lattice,
 blend law)** — so the other half of the toolkit is machinery for identifying that
 tuple from pixels alone.
 
-## Status: under construction
+## Where to read next
 
-Ported from a larger private working repo, one certified layer at a time.
-The plan of record and roadmap live in `docs/PLAN.md` (arriving with step 6).
+| | |
+|---|---|
+| [docs/LAWS.md](docs/LAWS.md) | the measured physics every claim rests on — pen lattice, blend, producer post-laws, colour |
+| [docs/METHOD.md](docs/METHOD.md) | how this kind of problem is worked: eight rules that cost real time |
+| [docs/FONTS.md](docs/FONTS.md) | what ships, what you regenerate, and why a fresh clone has 13 of 75 glyph sets |
+| [fixtures/gate-ref/README.md](fixtures/gate-ref/README.md) | the gate's expected numbers, and all 40 □ looked at one by one |
 
-- [x] **1. ftclone** — the rasterizer clone + font parsers, self-certifying
-- [x] **2. engine** — the reader (bands, matcher, certificate) + unit suite
-- [x] **3. glyph pipeline** — registry · bundle · fontgen, with the licence split
-- [x] **4. the reader CLI + the byte-identical gate** — 18 documents, 2.44 M
-      glyphs, byte-identical; Chrome dropped
-- [x] **5. `sync:recto`** — this repo is now the source of the engine Recto runs
-- [ ] 6. docs — the thesis, the pen/blend laws, the methodology
-- [ ] 7. `lab/` — the hunt half (identify · sweep · m-bank)
-- [ ] 8. `lab/rust/` — the fast sweep engine
-
-## Running what exists
+## What runs with nothing installed
 
 ```bash
 npm install
@@ -38,25 +32,59 @@ npm run certify:ftclone   # the rasterizer clone vs the real mupdf
 npm test                  # engine primitives on synthetic pages (~40 ms)
 ```
 
-Neither needs a PDF, a corpus document, or a system font.
+```
+pen lattice, measured now: x 5 distinct rasters per px (4 phases of 1/4 px + the 1-px shift), y 2 (integer rounding — no subpixel y)
 
-## Reading a document
+CERTIFIED TTF y-phase  0/64 — 0 diffs over 1128 renders
+CERTIFIED CFF y-phase  0/64 — 0 diffs over 1128 renders
+```
+
+Neither needs a PDF, a corpus document, or a system font — a deliberate
+constraint, not a convenience. `ftclone/` is a JS port of the glyph pipeline
+inside **mupdf 1.28 wasm** (FreeType 2.13 smooth rasterizer, integer 26.6
+throughout); everything else depends on it, so it certifies itself against the
+real thing, in two pipelines that share almost no code below the outline.
+
+## A read, end to end
 
 ```bash
-node tools/rasterize-mupdf.mjs --pdf yours.pdf         # fill the raster cache
-node tools/blind-read.mjs --pdf yours.pdf --all --pool nimbus791 --out read.txt
+node tools/rasterize-mupdf.mjs --pdf fixtures/corpus/nimbus791/EFTA00751637.pdf
+node tools/blind-read.mjs --pdf fixtures/corpus/nimbus791/EFTA00751637.pdf \
+     --page 1 --pool nimbus791 --truth fixtures/corpus/nimbus791/EFTA00751637.txt \
+     --json p1.json
+```
+
+```
+  page 1: 76 bands
+
+76 lines, 4612 glyphs, 0 unreadable clusters (□), 0.4s
+vs truth: 76 rows letter-exact (76 also space-exact), 0 rows differ
 ```
 
 `--pool` names a **certified family read command** — the glyph sets, tolerance
 and blend flags that family was actually proven with, taken from
-`tools/glyph-registry.mjs` so it cannot drift. Reading is not rendering: the
-rasterizer decodes the producer's own embedded page image, because rendering
-the page would invent pixels and there would be nothing left to certify
-against.
+`tools/glyph-registry.mjs` so it cannot drift. `--truth` is a check, not an
+input: the reader never sees it.
 
-Ink the reader cannot explain comes back as `□` with coordinates rather than as
-a guess, which is why a `□` count is a headline number below and not a defect
-to be tuned away.
+One line of `p1.json`, which is where the certificate lives:
+
+```json
+{ "baseline": 101, "phy": 0, "font": "nimbus791", "fails": 0,
+  "text": "Received: by 10.229.235.4 with SMTP id ke4mr6853629qcb.201.1291165934346;",
+  "glyphs": [["R", 37.25], ["e", 44.5], ["c", 52], ["e", 59.5], ["i", 66.75], … ] }
+```
+
+`"fails": 0` is the claim: every ink pixel of that band was reproduced exactly.
+Note the pens — 37.25, 44.5, 66.75. Nobody told the reader that this producer
+places pens on a ¼-px lattice; it fell out of the search, and it is
+[law §1](docs/LAWS.md#1-the-pen-lattice) turning up in a real document. Word
+spacing is measured the same way: the space advance here is **7.4077 px**,
+self-calibrated from the gap histogram rather than assumed, which is how narrow
+styled spaces become measurements instead of errors.
+
+Reading is not rendering: the rasterizer decodes the producer's own embedded
+page image, because rendering would invent pixels and leave nothing to certify
+against ([law §7](docs/LAWS.md#7-the-page-is-decoded-never-rendered)).
 
 ## The gate
 
@@ -70,36 +98,27 @@ npm run gate
 ```
 
 ```
-gate: 18/18 ok, 56s total
+gate: 18/18 ok, 55s total
 ```
 
-18 documents · **33,736 lines · 2,436,238 glyphs · 40 □** · 56 s. The 11
-`nimbus791` documents also carry truth transcripts and match **5,028 of 5,028
-rows, spacing included**.
-
-All 40 □ have been looked at rather than assumed away, and **24 of them are
-ordinary black text** — a face missing from a pool, which is a hunt and a
-winnable one. The rest is colour and graphics, which the reader is right to
-refuse. The census is in
-[fixtures/gate-ref/README.md](fixtures/gate-ref/README.md); it corrects an
-older record that had written all 38 of `nimbusrom`'s off as red legend and
-seal.
-
-The documents themselves are real government PDFs and are not distributed: they
-live in a gitignored `fixtures/corpus/`, and most pools need glyph sets whose
-faces are not redistributable either. So a fresh clone runs 0 of 18 — and says
-so, per document, naming the missing fixture or set. **Skipping is loud, and it
-is not a pass.** The `nimbus791` block is the cheap way in: its pool is entirely
-free, so those 11 run with no system font at all.
-
-Details, including what the reference has already caught:
+18 documents · **33,736 lines · 2,436,238 glyphs · 40 □**. The 11 `nimbus791`
+documents also carry truth transcripts and match **5,028 of 5,028 rows, spacing
+included**. All 40 □ have been looked at rather than assumed away — **24 are
+ordinary black text**, i.e. a face missing from a pool, which is a hunt and a
+winnable one; the rest is colour and graphics the reader is right to refuse.
+Census, and what the reference has already caught:
 [fixtures/gate-ref/README.md](fixtures/gate-ref/README.md).
+
+The documents are real government PDFs and are not distributed (gitignored
+`fixtures/corpus/`), and most pools need glyph sets whose faces are not
+redistributable either — so a fresh clone runs 0 of 18, and says so per document,
+naming the missing fixture or set. **Skipping is loud, and it is not a pass.**
+The `nimbus791` block is the cheap way in: its pool is entirely free.
 
 ## Recto — the same bytes, in a browser
 
 [Recto](../Recto) is a Django PDF editor whose `ocr_tool` plugin runs this
-engine client-side. It does not have a copy of the engine; it has *these* files,
-pushed by:
+engine client-side. It has no copy of the engine; it has *these* files:
 
 ```bash
 npm run sync:recto           # -> ../Recto/ocr_tool (default; --recto <path>)
@@ -107,103 +126,54 @@ npm run sync:recto:check     # report stale, write nothing, exit 1 if stale
 npm run recto-test           # end-to-end: Django + headless Chrome + a real upload
 ```
 
-The direction is the whole point. The engine is developed **only here**, where
-the gate can certify it, and Recto's copies are verbatim and never hand-edited
-there — so a read in the browser is the read the gate proved. `--check` is what
-makes that claim auditable: it byte-compares and exits non-zero, so drift is
-caught rather than assumed absent. Engine cache-busters in `tool.py` are
-rewritten to a content hash, so a browser refetches exactly when a file changed.
+The direction is the whole point: the engine is developed **only here**, where
+the gate can certify it, so a read in the browser is the read the gate proved.
+`--check` makes that auditable instead of assumed — it byte-compares and exits
+non-zero. Two things the sync refuses to do quietly:
 
-`recto-test` uploads a **gate document** through the real file input
-(`fixtures/corpus/nimbus791/EFTA00751637.pdf`) and drives the real buttons,
-because a programmatic call would mask dead UI wiring — that bug has happened.
-It is the one thing here that still needs a headless browser, which is why
-`puppeteer-core` is a **devDependency**; the reader, the rasterizer and the gate
-have no browser dependency at all.
+- **push an incomplete `glyphs.bin`.** The bundle holds whatever `.npz` you have
+  locally, so a fresh clone would push 13 of 75 sets and swap Recto's dictionary
+  for a smaller one with no error and no crash. The gate cannot catch it either
+  — it reads through *named pools*, never the whole bundle. So the sync names
+  the missing sets and stops (`--allow-partial` if you mean it).
+- **let a UI bug hide.** `recto-test` uploads a gate document through the real
+  file input and clicks the real buttons; a programmatic call would mask dead
+  wiring, and that bug has happened. It is the only thing here that needs a
+  browser, which is why `puppeteer-core` is a **devDependency**.
 
-**Syncing an incomplete `glyphs.bin` is refused.** The bundle contains whatever
-`.npz` you have locally, so a fresh clone builds one with 13 of 75 sets —
-pushing that would swap Recto's dictionary for a smaller one with no error and
-no crash, just a reader that quietly stops recognizing faces. The gate cannot
-catch it either, because the gate reads through *named pools*, not the whole
-bundle. So the sync names the missing sets and stops (`--allow-partial` if you
-really mean it).
-
-## engine
-
-`engine/` is the DOM-free matcher core — ink bands, baseline pinning, the
-left→right composite-aware scan, object/redaction detection, and the per-line
-certificate. It is shared verbatim by the Node CLI and the browser app, so the
-scanning physics has exactly one implementation.
-
-`test/engine.test.js` covers that physics on **synthetic** pages only: band
-finding, object detection (rules, redaction boxes, stacked boxes), `scanLine`
-(byte-exact read, the honest `□` on unknown ink, blend-law overlap, tolerance,
-palette quantization), space calibration, and `readPage` end-to-end. 27 tests,
-~40 ms, no assets — which is why they run before the slow document gate.
-
-## ftclone
-
-`ftclone/` is a JS port of the exact glyph pipeline inside **mupdf 1.28 wasm**
-(FreeType 2.13 smooth rasterizer, integer 26.6 throughout). Everything else
-depends on it, so it certifies itself against the real thing:
-
-```bash
-npm install
-npm run certify:ftclone
-```
+## Layout
 
 ```
-CERTIFIED TTF y-phase  0/64 — 0 diffs over 1128 renders
-CERTIFIED CFF y-phase  0/64 — 0 diffs over 1128 renders
+ftclone/    the rasterizer clone + font parsers — the certified core, self-certifying
+engine/     the DOM-free matcher: ink bands, baseline pin, the composite-aware
+            scan, object/redaction detection, the per-line certificate
+tools/      fontgen · glyph registry/bundle · rasterizer · reader CLI · gate · sync
+fixtures/   gate documents (gitignored) + the reference transcripts
+fonts/      the source faces this repo may legally ship
+docs/       the laws, the method, the font/licence story
 ```
 
-Two pipelines, because they share almost no code below the outline: a TrueType
-face against itself through mupdf, and a CFF face against mupdf's *builtin*
-`Courier` — which is URW Nimbus Mono PS, so that run also proves the file in
-`fonts/` is the same font mupdf embeds.
+`engine/` is shared verbatim by the CLI and the browser app, so the scanning
+physics has exactly one implementation; `test/engine.test.js` covers it on
+**synthetic** pages only — 27 tests, ~40 ms, no assets, which is why they run
+before the slow document gate.
 
-The cert depends on **no corpus pixels and no system font** — it runs on a clean
-clone. That is a deliberate constraint, not a convenience.
+## Status
 
-### Why a clone at all, when mupdf is right there
+Ported from a larger private working repo, one certified layer at a time.
 
-`fillText` cannot place a pen anywhere. mupdf's glyph cache quantizes the pen
-x to ¼ px, and rounds pen y to the nearest **integer** — measured, not assumed:
-`fillText` at y=28.5 is byte-identical to y=29 (SAD 0) and differs from y=28,
-while x=10.25 renders distinctly from x=10. FTClone places pens on any 1/64,
-which is what makes a real search over pen lattices possible.
+- [x] **1. ftclone** — the rasterizer clone + font parsers, self-certifying
+- [x] **2. engine** — the reader core + unit suite
+- [x] **3. glyph pipeline** — registry · bundle · fontgen, with the licence split
+- [x] **4. reader CLI + the byte-identical gate** — 18 documents, 2.44 M glyphs;
+      Chrome dropped
+- [x] **5. `sync:recto`** — this repo is now the source of the engine Recto runs
+- [x] **6. docs** — the laws, the method, one worked example
+- [ ] 7. `lab/` — the hunt half: identify · sweep · m-bank · families
+- [ ] 8. `lab/rust/` — the fast sweep engine, with its own certify gate
 
-Those 4 x-phases are the certified set. The `y-phase 32/64` row in the cert
-output is *expected* to differ and is excluded from the pass criterion — the day
-it stops differing, something changed in mupdf.
-
-## Glyph sets and fonts
-
-The reader matches against `assets/fonts/*.npz` — rasterized glyph bitmaps, one
-file per (face, size, pen-phase, blend-law) config, generated by `fontgen`.
-
-A `.npz` is a set of rasterized bitmaps **of a typeface**, so it inherits that
-typeface's licence. This repo ships every set it may legally ship — 13 of 75 —
-and tells you how to rebuild the rest from your own machine:
-
-```bash
-node tools/glyph-sets.mjs            # what you have, what you don't, and why
-node tools/glyph-sets.mjs --plan     # the exact command for each missing set
-node tools/glyph-sets.mjs --verify   # 13 shipped sets rebuild byte-identically
-```
-
-The 13 come from URW Nimbus and DejaVu; their source faces are in
-[`fonts/`](fonts) (licences: [fonts/LICENSES.md](fonts/LICENSES.md)), so
-`--verify` re-renders each one and byte-compares rather than asking you to take
-it on trust. 47 more regenerate from stock system fonts — `--set` supplies the
-exact recipe, which matters because 26 sets use a non-default character list and
-the wrong one silently changes the bytes. 9 need a specific font *build*, and 6
-were cut from document pixels and have no reproduction path at all.
-
-Full explanation, including why a fresh clone is *expected* to be missing 62
-sets: **[docs/FONTS.md](docs/FONTS.md)**.
-
-Byte-exact results depend on the exact font build. This work has hit that wall
-twice — Calibri 1.02 vs the installed 6.2x, and a DejaVu Serif build differing in
-`t` and `D` alone — which is why the build is treated as part of the proof.
+Open, and known: a **synthetic gate** (a page whose transcript is known, built
+with no corpus pixels) is the one thing that would let a stranger run anything —
+`fixtures/gate-ref` proves the reader, but only against documents that cannot be
+shipped. Also unsettled: the licence, and whether `ftclone` still certifies
+against a *different* mupdf build — i.e. what exactly the compatibility claim is.
