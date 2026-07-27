@@ -192,6 +192,23 @@ if (top && top.exact >= Math.max(5, targets.length * 0.03) && top.chars >= 4) {
   console.log(`    node tools/blind-read.mjs --pdf <doc.pdf> --page 1 --glyphs ${top.f.set ?? '<set>'}`);
 } else {
   console.log('VERDICT: no known family matches.');
+  // ...but "below the verdict bar" is not "zero", and the two must not print
+  // the same. Exactness cannot false-positive, so ONE byte-exact target is
+  // already a positive — it just may not be enough to name a producer on its
+  // own. A page-law family is exactly where this happens: under `--palette`
+  // the exact test has no palette step, so a right answer surfaces as a few
+  // percent of its targets (arial1194 scores 2/42 on EFTA00678329 and every
+  // other family scores 0). Printing only the bar's verdict there loses the
+  // answer, so name the nonzero rows and say what confirms them.
+  const leads = results.filter(r => !r.skipped && r.exact > 0);
+  if (leads.length) {
+    console.log(`  BUT ${leads.length} famil${leads.length === 1 ? 'y is' : 'ies are'} not zero: `
+      + leads.map(r => `${r.f.name} ${r.exact}/${targets.length} (${r.chars} chars)`).join(', '));
+    console.log('  Exactness cannot false-positive — that is a lead, not noise. A thin score is');
+    console.log('  what a page-law family looks like here (families.mjs pageLaw `palette-quant`),');
+    console.log('  so confirm with the reader, which DOES apply the page law:');
+    console.log(`    node tools/blind-read.mjs --pdf <doc.pdf> --page 1 --glyphs ${leads[0].f.set ?? '<set>'} [--palette]`);
+  }
   if (skipped) console.log(`  ${skipped} families could not even be TRIED — a missing face is a statement`);
   if (skipped) console.log('  about this machine, not about the document (../docs/METHOD.md rule 3).');
   console.log('  Next, in cost order:');

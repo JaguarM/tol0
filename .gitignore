@@ -3,6 +3,7 @@ node_modules/
 # --- the corpus: real documents. Never committed, in any form. -------------
 fixtures/corpus/
 *.pdf
+lab/base64/
 
 # --- derived caches --------------------------------------------------------
 **/raster-cache/

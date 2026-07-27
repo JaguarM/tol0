@@ -146,6 +146,40 @@ export const FAMILIES = [
   { name: 'tnr8-linear10', renderable: true, font: 'TimesNewRoman8_Clean.ttf', em64: 682, sizePx: 10.667, fy: [0], gid: 'cmap', law: 'fzLin',
     set: 'tnr8lin10', record: 'gate report.pdf body — per-USER font, see FONT_DIRS' },
 
+  // ---- sans-body email family: Arial 14 pt under the palette page law ----
+  // The corpus's majority email BODY face. Its certified read command has
+  // shipped as glyph-registry POOLS `arialEmail` since 07-22 while this file
+  // had no entry at all, so `identify` answered "no known family matches" on a
+  // SOLVED producer and the registry's own comment cited a family that did not
+  // exist. Measured here 2026-07-27 on EFTA00678329 p1, 42 component-harvested
+  // targets (`hunt harvest`, since Arial is proportional):
+  //   - `--scan arial.ttf --ems 1150..1240` spikes at em64 1194 and NOWHERE
+  //     else in the 91-wide window. 1194/64 = 18.656 px = 14 pt at 96 dpi.
+  //   - the reader reads the page whole: 9 lines / 365 glyphs / 7 □ at tol 0
+  //     under `blind-read --pool arialEmail`.
+  //
+  // **Expect a THIN identify score here, and do not read it as a weak match.**
+  // This producer palettizes the page (`palette-quant` below) and identify has
+  // no palette step, so a target can only match where the ideal byte already
+  // is a palette gray. Pushing the SAME config's candidate bytes through the
+  // page's own quant map lifts it from 2/42 (1 char) to 14/42 (9 chars), while
+  // every decoy stays flat 0 under that same map — arial at em64 1024/1190/
+  // 1198, times/tahoma/verdana at 1194, and arial 1194 under fzLin and src.
+  // Face, size, lattice and law are right; the page is quantized.
+  //
+  // That is the family's rule, not this document's quirk: of 2,500 corpus PDFs
+  // sampled by `mbank scan --tol1`, 54 sight arial@1194 and only ONE carries a
+  // byte-exact `m` at all — the bank's own post-law grading (`nExact/nHit`).
+  { name: 'arial1194', renderable: true, font: 'arial.ttf', em64: 1194, fy: [0], gid: 'cmap', law: 'fz',
+    set: 'arial1194', record: 'EFTA00678329 p1 — 365 glyphs / 7 □ at tol 0 via pool arialEmail; identify 2/42 raw, 14/42 through the page palette, all decoys 0' },
+  // Weight companions: same producer, same tuple, a different face file. They
+  // ship in the certified pool, and NEITHER fires on EFTA00678329 — its body is
+  // regular and its headers are corpus-law times16 (both halves ride the one
+  // pool). So these two are carried from the pool, unproven on pixels of their
+  // own; they are the entry a bold- or italic-heavy family document needs.
+  { name: 'arialbd1194', renderable: true, font: 'arialbd.ttf', em64: 1194, fy: [0], gid: 'cmap', law: 'fz', set: 'arialbd1194' },
+  { name: 'ariali1194', renderable: true, font: 'ariali.ttf', em64: 1194, fy: [0], gid: 'cmap', law: 'fz', set: 'ariali1194' },
+
   // ---- Tahoma email family: the largest tol-0 corpus population ----
   // Found by the m-bank prefilter (`mbank.mjs scan`) and proven the same day.
   // Plain fz, integer y, no post-law — the exotic part was only finding it.
@@ -206,8 +240,8 @@ export const FAMILIES = [
   // ---- page-law families: recognize by fingerprint, do not try to render ----
   { name: 'palette-quant', renderable: false,
     fingerprint: 'reads "almost, but ±1" against a proven rasterizer',
-    action: 'reader --palette: page byte = nearest available gray, ties darker. The palette is read off the page, so its grays are fixpoints (../docs/LAWS.md §4).',
-    record: 'gate v3.pdf, email.pdf P1' },
+    action: 'reader --palette: page byte = nearest available gray, ties darker. The palette is read off the page, so its grays are fixpoints (../docs/LAWS.md §4). It also SUPPRESSES identify: the exact test has no palette step, so a renderable family under this law scores a few percent of its targets rather than none — see `arial1194`, 2/42 raw vs 14/42 through the map, decoys 0 under both.',
+    record: 'gate v3.pdf, email.pdf P1; EFTA00678329 (189 of 256 grays present, identity on every one of them — a rich palette is not a detector, see mbank.mjs)' },
   { name: 'jpeg-jitter', renderable: false,
     fingerprint: 'mode-3 colour raster, ±1 channel jitter on ink, blue mailto links',
     action: 'reader --tol 1, justified by the documented producer law and by every tol-0 document in the family staying byte-identical under it',

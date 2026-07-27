@@ -26,7 +26,9 @@
 export const SETS = [
   ['arial16', 'arial_16.npz'],
   ['arialbd16', 'arialbd_16.npz'],
-  // sans-body email family (lab/families.mjs, solved 07-22 late):
+  // sans-body email family (lab/families.mjs `arial1194`, solved 07-22 late;
+  // the lab entry itself landed 2026-07-27 — until then this citation pointed
+  // at a family that was not there, and `identify` could not name the producer):
   // REAL Windows Arial at em64 1194 (= 14 pt at 96 dpi), ¼-px x pens,
   // integer y, NO linear step, per-page /Indexed palette — the overlay's
   // "Helvetica 14" was literal modulo the name. Probe: 'a' of "afternoon" +
