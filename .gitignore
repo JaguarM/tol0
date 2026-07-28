@@ -1,5 +1,10 @@
 node_modules/
 
+# --- per-machine harness config --------------------------------------------
+# TOL0_FONT_DIRS points at this machine's scratch roster (lab/.fontstage/), so
+# it is a per-machine path by construction and never the same on two boxes.
+.claude/settings.local.json
+
 # --- the corpus: real documents. Never committed, in any form. -------------
 fixtures/corpus/
 *.pdf

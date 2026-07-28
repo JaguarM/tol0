@@ -37,7 +37,7 @@ import { writePgm, inkBbox, readPgm } from '../pgm.mjs';
 
 const ROOT = new URL('../../', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1').replace(/\/$/, '');
 const HERE = `${ROOT}/lab/rust`;
-const HUNT = `${HERE}/target/release/hunt.exe`;
+const HUNT = `${HERE}/target/release/hunt${process.platform === 'win32' ? '.exe' : ''}`;
 const FIX = `${HERE}/fixtures`;
 const REGEN = process.argv.includes('--regen');
 
@@ -51,7 +51,7 @@ const node = (script, ...argv) =>
   execFileSync(process.execPath, [`${ROOT}/${script}`, ...argv], { encoding: 'utf8', cwd: ROOT });
 
 if (!existsSync(HUNT)) {
-  console.error(`hunt.exe missing — run: npm run rust:build`);
+  console.error(`${HUNT} missing — run: npm run rust:build`);
   process.exit(2);
 }
 mkdirSync(FIX, { recursive: true });
