@@ -522,11 +522,20 @@ pub fn run(p: &SweepParams) -> Result<(), String> {
             100.0 * r.weight as f64 / tpl.total_obs as f64);
     }
     if rows.is_empty() {
-        println!("  NONE — no (face, em64, pen, law) in this roster reproduces one target byte-exactly.");
-        println!("  That is a statement about THIS ROSTER (../docs/METHOD.md rule 3). Say what it enumerated:");
-        println!("    {} faces, em64 {}, all 4096 pens, {} laws.", fonts.len(),
-            match &p.at { Some(a) => a.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(","),
-                          None => format!("{}..{}", p.ems.0, p.ems.1) }, laws::N_LAWS);
+        // --dims-only stops before stage B, so there is nothing to refute here.
+        // Printing the usual "no (face, em64, pen, law) reproduces a target"
+        // would claim an enumeration that never ran — the exact thing METHOD
+        // rule 3 forbids, aimed at ourselves.
+        if p.dims_only {
+            println!("  (--dims-only: stage B never ran, so NOTHING is refuted here.");
+            println!("   Stage A only ranked em64 by ink dimensions. Re-run without --dims-only to test exactness.)");
+        } else {
+            println!("  NONE — no (face, em64, pen, law) in this roster reproduces one target byte-exactly.");
+            println!("  That is a statement about THIS ROSTER (../docs/METHOD.md rule 3). Say what it enumerated:");
+            println!("    {} faces, em64 {}, all 4096 pens, {} laws.", fonts.len(),
+                match &p.at { Some(a) => a.iter().map(|e| e.to_string()).collect::<Vec<_>>().join(","),
+                              None => format!("{}..{}", p.ems.0, p.ems.1) }, laws::N_LAWS);
+        }
     } else {
         println!("\nconfirm the winner before believing it:  node lab/identify.mjs --targets {} --scan {} --ems {}..{} --law {}",
             p.targets, rows[0].font, rows[0].em64, rows[0].em64, rows[0].law.replace('~', ""));

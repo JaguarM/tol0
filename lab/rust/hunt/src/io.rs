@@ -151,12 +151,23 @@ pub fn write_pgm(path: &Path, w: i32, h: i32, px: &[u8]) -> std::io::Result<()> 
 /// gap once hid a face for a week. Both directories, plus the faces this repo
 /// ships — and a miss returns None, which is a statement about this machine
 /// and not about the document.
+/// Installed is not the same set as present: Office caches its cloud fonts
+/// under AppData/Local/Microsoft/FontCache/*/CloudFonts and applications ship
+/// their own, none of them in any directory below. `TOL0_FONT_DIRS`
+/// (`;`-separated) appends scratch roster directories so a sweep can widen the
+/// roster without pretending those faces are installed. Must stay in step with
+/// ../../families.mjs `FONT_DIRS` — two engines, one roster.
 pub fn font_dirs(root: &Path) -> Vec<PathBuf> {
     let mut v = vec![PathBuf::from("C:/Windows/Fonts")];
     if let Ok(local) = std::env::var("LOCALAPPDATA") {
         v.push(PathBuf::from(local.replace('\\', "/")).join("Microsoft/Windows/Fonts"));
     }
     v.push(root.join("fonts"));
+    if let Ok(extra) = std::env::var("TOL0_FONT_DIRS") {
+        for d in extra.split(';').filter(|s| !s.is_empty()) {
+            v.push(PathBuf::from(d.replace('\\', "/")));
+        }
+    }
     v
 }
 

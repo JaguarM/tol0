@@ -38,10 +38,18 @@ import { existsSync } from 'node:fs';
 // C:/Windows/Fonts alone is HALF the machine. That gap hid DejaVu Serif for a
 // week and then wrote off TimesNewRoman8 as a lost artifact. Both directories,
 // always — and `face()` reports which one answered.
+// The same rule applied one step further: a face that is INSTALLED is not the
+// same set as a face this machine HAS. Office caches its cloud fonts under
+// AppData/Local/Microsoft/FontCache/*/CloudFonts, and applications ship their
+// own; none of those are in any of the three directories below, so a hunt that
+// stops here reports "not this face" when it means "not installed here".
+// TOL0_FONT_DIRS (`;`-separated) appends scratch roster directories for exactly
+// that — widen the roster without pretending the fonts are installed.
 export const FONT_DIRS = [
   'C:/Windows/Fonts',
   `${(process.env.LOCALAPPDATA ?? '').replace(/\\/g, '/')}/Microsoft/Windows/Fonts`,
   new URL('../fonts/', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1'),
+  ...(process.env.TOL0_FONT_DIRS ?? '').split(';').filter(Boolean).map(d => d.replace(/\\/g, '/')),
 ];
 
 /** Resolve a bare font file name against every roster directory. Returns null
@@ -231,11 +239,112 @@ export const FAMILIES = [
   { name: 'calibrib102-16', renderable: true, font: 'calibrib-102.ttf', em64: 1024, fy: [0], gid: 'cmap', law: 'mid', set: 'calibrib102mid_1024' },
 
   // ---- EFTA01150379: DejaVu Serif @ 786 ----
-  // The one entry that is deliberately NOT a pool: the face is right and the
-  // BUILD is wrong, differing in lowercase 't' alone, so it reads at tol 4 and
-  // tol is part of the proof (METHOD rule 5). Reproduce it explicitly.
+  // The one entry that is deliberately NOT a pool: the face is right, the BUILD
+  // is wrong, so it reads at tol 4 and tol would be part of the proof
+  // (METHOD rule 5). Reproduce it explicitly. NARROWED 2026-07-27 — the miss is
+  // not "lowercase t alone", it is every glyph with off-curve points:
+  //
+  //   * OFF-CURVE POINTS PARTITION THE SPLIT EXACTLY — measured on 5,172
+  //     ISOLATED page components (clean 1-px ring, window cut as a page
+  //     RECTANGLE), not on the 391 targets, which are contaminated (below):
+  //         I + 1 F 7 H 4   2,204 instances   100% byte-exact
+  //         E                 275                99%
+  //         N  M              104             83% / 72%
+  //         G C 3 2 0 p 8 B D P 5 S Q 9 b 6 a c O s e U o
+  //                         2,589 instances     0%
+  //     The 100% group is exactly the glyphs with ZERO off-curve points in
+  //     glyf; the 0% group is exactly the glyphs that have them.
+  //   * THE TARGET SET UNDERSTATES THIS BADLY. lab/targets/DJ840 cuts a window
+  //     as the 8-connected COMPONENT with every other pixel forced to 255, so a
+  //     neighbour's faint tail and the glyph's own sub-250 fringe disagree.
+  //     Over 12 pages: component-cut windows 16.5% byte-exact, the same
+  //     components cut as page RECTANGLES 35.1%, and isolated ones 51.7%.
+  //     That is why the same character shows both exact and missing variants
+  //     in the target set — a cut artifact, not a font one.
+  //   * HINTING IS REFUTED. Instruction length does not partition anything: the
+  //     exact glyphs carry 48..499 bytes of instructions (X has 499), the
+  //     curved ones 43..295. A grid-fitted producer would have moved the stems
+  //     of K L T X too, and those are byte-exact.
+  //   * THE RASTERIZER IS REFUTED. ftclone's conic path is certified against
+  //     mupdf on Carlito — a quadratic TTF — over the whole printable ASCII
+  //     alphabet, curves included, at 0 diffs / 1128 renders. Separately,
+  //     routing every quadratic through the CUBIC walker by exact degree
+  //     elevation (c1 = p0+⅔(q−p0), c2 = p2+⅔(q−p2)) changes NOTHING, so it is
+  //     not conic-vs-cubic sampling either.
+  //   * SIZE IS NOT IT. em64 786 is a sharp unique spike: 9 targets exact,
+  //     and every em64 in 776..796 other than 786 scores exactly 0.
+  //   * So what differs is the off-curve CONTROL POINT VALUES, by ~1..2 font
+  //     units at 2048 upm — curve edges land 1..2/255 off, interior and edge
+  //     alike, which is a redrawn outline and not a placement error.
+  //
+  //   * THE LAW IS PLAIN fz, MEASURED not assumed. Aligning every window whose
+  //     strong ink (<200) already agrees and tabulating coverage -> page byte:
+  //     241 of 242 coverage values map to exactly fz(cov), single-valued. The
+  //     one multi-valued entry is cov 0, which is a neighbour's tail landing in
+  //     the box, not a law.
+  //   * THE PEN LATTICE IS EXACTLY THE ¼-px ONE. Rebuilding the render bank at
+  //     8, 16 and 64 x-phases reproduces the SAME 2,673 isolated components as
+  //     4 phases — not one extra. Independently, the page draws its 5x11 glyph
+  //     in exactly 4 distinct rasters over 5,799 instances (1496/1467/1421/1415)
+  //     and its 9x8 in exactly 2. Unlike page-downscale-816x1073, this document
+  //     really is on the lattice.
+  //   * VERSION DRIFT IS REFUTED, and not by sampling: the SplineSet geometry
+  //     of this exact 18-glyph partition (coordinates + operator only, point
+  //     numbering stripped so a re-save cannot fake a diff) is IDENTICAL across
+  //     every shipped DejaVuSerif.sfd — all 2.x release tags plus 1.0 and 1.10,
+  //     Vera-derived base included. The source is `Order2: 1`, native
+  //     quadratics, so there is no cubic→quad build conversion to hide in.
+  //     Confirmed independently from the repository history: the FIRST commit
+  //     (2005-04-13, Version 1.8) and 2007-03-21 (Version 2.15) were built from
+  //     .sfd with FontForge and both render the DJ840 targets identically to
+  //     shipped 2.34 — same glyf points for 'o', same 9/67. Two years of
+  //     history and 26 minor versions change nothing here.
+  //   * THE FLATTENING ERA IS REFUTED, all five of them. Straight and diagonal
+  //     segments bypass subdivision and go straight to gray_render_line — which
+  //     is why K L T X Y Z w x hold exact and simultaneously pin the producer
+  //     to the FreeType LINE path — while conics go through gray_render_conic,
+  //     which changed five times between 2007 and the 2.13 ftclone speaks. All
+  //     five eras were ported behind `FTClone.conicEra` and run at em64 786
+  //     (curved-target residual, lower is closer; exact count never moved off
+  //     9/67 for any of them):
+  //         2.10+        DDA, the certified default        473   <- closest
+  //         2.6.5–2.9.1  ft28, uniform bisection           473   (identical)
+  //         2.4.12–2.6.2 ft261, recursive subdivision      479
+  //         ~2.4.8       verified ≡ 2.6.1 (code motion)    479
+  //         ≤2.3.x       ft240; 2.3.12 verified ≡ 2.4.0    538 / 982 / 2110
+  //                      (conic_level 64 / 128 / 32)
+  //     Every legacy era moves AWAY from the page, so the residual is not
+  //     flattening-shaped. At this size the modern rule barely subdivides at
+  //     all — swapping DDA for the 2.6.1 rule changes 'o' by ZERO bytes — so
+  //     the era simply has no leverage on a 12.28 px glyph.
+  //
+  // Where that leaves it. Face, em64, blend law and pen lattice are PROVEN —
+  // thousands of straight-sided instances are byte-exact and nothing else on a
+  // 1,253-face roster reproduces even one. Upstream geometry (to the first
+  // commit), hinting, the rasterizer, degree elevation, the size and all five
+  // flattening eras are eliminated. The whole remaining defect is that curved
+  // glyphs land 1..2 coverage units off, always, and only them.
+  //
+  // Since ftclone's conic path is certified against mupdf 1.28 on Carlito's
+  // curves at 0 diffs, a mupdf 1.28 producer would MATCH. So the producer is a
+  // different FreeType build, and the axis that has never been tested is the
+  // BUILD-TIME one: FT_INT64 vs the 32-bit fallback arithmetic, and the real
+  // libfreetype of a 2009-2015 Linux imaging stack. That is a native test, not
+  // a port — render DejaVu Serif at em64 786 through Ubuntu's own libfreetype
+  // across a few versions and diff against the page. Two outcomes, both worth
+  // having: a hit closes the pool and adds a fifth axis to the tuple, and a
+  // miss finally sends the hunt to distro package archives for a patched font.
+  //
+  // Practical note for the reader, independent of all that: the 100% group is
+  // 46% of isolated instances. A read that windowed on page RECTANGLES rather
+  // than components would start from 35.1% instead of 16.5%.
+  //
+  // The published 9/391 is against a contaminated denominator: only 67 of the
+  // 391 DJ840 targets are single glyphs. This document's text is dense enough
+  // that 8-connected components fuse — the target labelled 'O' is 26 px wide
+  // against a 9 px render — so the honest score is 9 of 67.
   { name: 'dejavuserif786', renderable: true, font: 'DejaVuSerif.ttf', em64: 786, fy: [0], gid: 'cmap', law: 'fz',
-    set: null, record: 'EFTA01150379 — 115 templates / 31 chars / 21.0% of 2,194,088 instances byte-exact; 94.5%/page at tol 4' },
+    set: null, record: 'EFTA01150379 — 9/67 single-glyph DJ840 targets byte-exact (9/391 raw, 324 of those merged components); 21.0% of 2,194,088 instances byte-exact; 94.5%/page at tol 4' },
 
   // ---- page-law families: recognize by fingerprint, do not try to render ----
   { name: 'palette-quant', renderable: false,
@@ -246,10 +355,42 @@ export const FAMILIES = [
     fingerprint: 'mode-3 colour raster, ±1 channel jitter on ink, blue mailto links',
     action: 'reader --tol 1, justified by the documented producer law and by every tol-0 document in the family staying byte-identical under it',
     record: 'EFTA00142692 — 361 □ at tol 0, 36 □ at tol 1' },
-  { name: 'unknown-816x1073', renderable: false,
-    fingerprint: '816×1073 pages (MediaBox 612×804.75 pt) and a CONTINUOUS pen lattice — zero byte-identical cell repeats, which is the tell that no finite phase set generated them',
-    action: 'OPEN. Not matchable by the ¼-px engine as-is; producer AND faces unidentified (the trio mixes g-shapes, so ≥2 faces). Verify face from glyph SHAPES before spending a sweep on it.',
-    record: 'open problem' },
+  // MECHANISM MEASURED 2026-07-27. The old entry had the symptom (a continuous
+  // pen lattice) but not the cause, and lab/base64/README.md drew the opposite
+  // conclusion from it — "lossless FlateDecode, so byte-exactness is reachable
+  // in principle". It is not: FlateDecode says the LAST encoding step was
+  // lossless, nothing about the resample before it. Three measurements:
+  //
+  //   1. A glyph's sub-pixel phase is a function of its ABSOLUTE PAGE X.
+  //      Over 666 two-column stems, the ink split f = left/(left+right) ramps
+  //      monotonically with x mod 8: .40 .48 .49 .52 .57 .63 .68 (sd ~.12,
+  //      n~90/bucket, so the ramp is ~20 SE wide). A pen lattice sets phase
+  //      from the text ADVANCE and can not know where the page grid is; a
+  //      fixed-grid resample is the only thing that does. THIS IS THE CRUX.
+  //   2. 8-connected components, 40 pages: the 8×11 bucket has 2,198
+  //      observations and 1,829 DISTINCT rasters, largest cluster 4. The same
+  //      count on a tol-0-readable control (EFTA00751637) gives 827
+  //      observations of 5×7 in exactly 4 distinct rasters — the 4-phase
+  //      lattice, visible in raw pixels.
+  //   3. 816 = 2550 × 96/300 exactly, and 612×804.75 pt at 300 dpi is
+  //      2550×3353. So the source is 300 dpi and the page is 96 dpi: a
+  //      rational 8/25 downscale, whose output period is the 8 px of (1).
+  //      Corroborating: 63% of horizontal ink runs measure 1.25–1.30 px
+  //      = 4 source pixels at 300 dpi, the next cluster exactly 3.
+  //
+  // So the page is not a per-pixel function of ANY 1× coverage map, and no
+  // (face, em64, pen, law) can reproduce it — which is why every roster miss
+  // below was a miss. Enumerated and refuted 2026-07-27, all returning zero:
+  // 1,253 faces (the installed roster + Office CloudFonts + app-bundled faces,
+  // via TOL0_FONT_DIRS) × em64 700..1100 × 4 x-phases under ANY MONOTONE LAW,
+  // not just the four in LAW_NAMES; and the dims-signature shortlist (Calibri
+  // 938..942 leads at 22/26 characters) additionally over the full 64×64 pen
+  // lattice, again under any monotone law. Calibri is also refuted by the rust
+  // sweep at 4096 pens × 4 laws over em64 920..960.
+  { name: 'page-downscale-816x1073', renderable: false,
+    fingerprint: '816×1073 pages (MediaBox 612×804.75 pt); sub-pixel phase tracks x mod 8, and one glyph shape has ~1800 distinct rasters where a 4-phase producer has 4',
+    action: 'NOT a face hunt, and a wider roster will not close it — the pixels are a 300 dpi bitonal source area-averaged 8/25 down to 96 dpi. Tolerance 0 is reachable only by reproducing THAT: rasterize bilevel at 3.125× and apply the same box resample. Until someone builds that, these documents have no pool and no □-free read. Do NOT widen a roster or loosen a tolerance against them.',
+    record: '17 documents in lab/base64/unidentified/; measured on EFTA02715081 (58 pp)' },
   { name: 'verdana-jitter-partial', renderable: false,
     fingerprint: 'mode-3 colour fax pages, verdana@1024 (≡ REFSAN.TTF), m-bank exact 40/40 — but the reader leaves ~⅓ of the bands unread',
     action: 'OPEN, and it is the READ that is open, not the face. tol 0 fails wholesale (2032 □) and tol 1 reads (44 □), which is the registered `jpeg-jitter` law, so the tolerance is justified rather than tuned. What is NOT explained: of 117 ink bands over 3 pages only 80 become lines. Band-picking 853/896 beside 1024 changes nothing (identical 80 lines / 4649 glyphs / 44 □), so the remainder is not a second SIZE — look for a second face, a stamp, or a fax header before widening anything. Do NOT add a glyph-registry pool until a document reads clean; a pool is a proven recipe.',

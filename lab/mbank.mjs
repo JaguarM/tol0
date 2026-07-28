@@ -114,6 +114,28 @@ function extractTtc(path, idx, out) {
   return out;
 }
 
+// An .otf is a CFF wrapped in an sfnt, and ftclone's loadCff() takes the bare
+// table — so lift it out, the same trick as a .ttc subfont. Until 2026-07-27
+// the roster took ttf/cff/ttc only, which silently dropped SEVEN INSTALLED
+// faces from the per-user directory (NimbusRomNo9L-Reg, three ITC Franklin
+// Gothic Std, three Helvetica cuts). An extension filter is a roster claim
+// too, and this one was wrong.
+function extractOtfCff(path, out) {
+  if (existsSync(out)) return out;
+  const b = readFileSync(path);
+  if (b.toString('latin1', 0, 4) !== 'OTTO') return null;
+  const n = b.readUInt16BE(4);
+  for (let i = 0; i < n; i++) {
+    const e = 12 + i * 16;
+    if (b.toString('latin1', e, e + 4) === 'CFF ') {
+      const off = b.readUInt32BE(e + 8), len = b.readUInt32BE(e + 12);
+      writeFileSync(out, b.subarray(off, off + len));
+      return out;
+    }
+  }
+  return null;
+}
+
 function roster() {
   const out = [];
   const add = (name, file, src) => out.push({ name, file, src });
@@ -123,14 +145,20 @@ function roster() {
   // Tag by roster POSITION, not by matching the path — 'C:/Windows/Fonts'
   // and the per-user '.../Microsoft/Windows/Fonts' both end in "Fonts", so a
   // name-shaped test labels the system roster as the repo's own.
+  // Anything past the third is a TOL0_FONT_DIRS scratch roster: tag it 'x:' so
+  // a verdict never reads as "installed" when the face merely exists on disk.
   const TAGS = ['', 'u:', 'lab:'];
   FONT_DIRS.forEach((dir, di) => {
     if (!existsSync(dir)) return;
     const d = dir.replace(/\/$/, '');
-    const tag = TAGS[di] ?? '';
+    const tag = TAGS[di] ?? 'x:';
     for (const f of readdirSync(d).sort()) {
       if (/\.(ttf|cff)$/i.test(f)) add(`${tag}${f.replace(/\.(ttf|cff)$/i, '')}`, `${d}/${f}`, tag || 'win');
-      else if (/\.ttc$/i.test(f)) {
+      else if (/\.otf$/i.test(f)) {
+        const base = `${tag}${f.replace(/\.otf$/i, '')}`;
+        const p = extractOtfCff(`${d}/${f}`, `${CACHE}/${base.replace(/[:#]/g, '_')}.cff`);
+        if (p) add(base, p, 'otf');
+      } else if (/\.ttc$/i.test(f)) {
         const n = ttcSubfonts(`${d}/${f}`);
         for (let i = 0; i < n; i++) {
           const base = `${tag}${f.replace(/\.ttc$/i, '')}#${i}`;

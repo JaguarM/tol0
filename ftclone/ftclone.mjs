@@ -158,6 +158,180 @@ class Raster {
       ai -= 3;
     }
   }
+  // gray_render_conic as it stood in FreeType 2.6.5 .. 2.9.1 — uniform
+  // bisection into 2^n segments driven by a decrement counter. Verbatim from
+  // freetype-2.8/src/smooth/ftgrays.c.
+  conicToFT28(cx6, cy6, tx6, ty6) {
+    const A = [];
+    for (let k = 0; k < 16 * 2 + 8; k++) A.push({ x: 0, y: 0 });
+    let ai = 0;
+    A[0].x = UPSCALE(tx6); A[0].y = UPSCALE(ty6);
+    A[1].x = UPSCALE(cx6); A[1].y = UPSCALE(cy6);
+    A[2].x = this.x; A[2].y = this.y;
+    if ((TRUNC(A[0].y) >= this.H && TRUNC(A[1].y) >= this.H && TRUNC(A[2].y) >= this.H) ||
+        (TRUNC(A[0].y) < 0 && TRUNC(A[1].y) < 0 && TRUNC(A[2].y) < 0)) {
+      this.x = A[0].x; this.y = A[0].y; return;
+    }
+    let dx = Math.abs(A[2].x + A[0].x - 2 * A[1].x);
+    const dy = Math.abs(A[2].y + A[0].y - 2 * A[1].y);
+    if (dx < dy) dx = dy;
+    let draw = 1;
+    while (dx > ONE_PIXEL / 4) { dx >>= 2; draw <<= 1; }
+    const div = (a, b) => Math.trunc(a / b);
+    const half = (p, q) => div(p + q, 2);
+    const split = i => {
+      let a, b;
+      A[i + 4].x = A[i + 2].x;
+      b = A[i + 1].x;
+      a = A[i + 3].x = half(A[i + 2].x, b);
+      b = A[i + 1].x = half(A[i].x, b);
+      A[i + 2].x = half(a, b);
+      A[i + 4].y = A[i + 2].y;
+      b = A[i + 1].y;
+      a = A[i + 3].y = half(A[i + 2].y, b);
+      b = A[i + 1].y = half(A[i].y, b);
+      A[i + 2].y = half(a, b);
+    };
+    do {
+      let sp = 1;
+      while ((draw & sp) === 0) {
+        split(ai); ai += 2; sp <<= 1;
+        if (ai + 4 >= A.length) for (let k = 0; k < 6; k++) A.push({ x: 0, y: 0 });
+      }
+      this.lineTo(A[ai].x, A[ai].y);
+      ai -= 2;
+    } while (--draw);
+  }
+  // gray_render_conic as it stood in FreeType <= 2.4.x (the 2007..2011
+  // vintage). Verbatim from freetype-2.4.0/src/smooth/ftgrays.c.
+  //
+  // The structural difference that matters at text sizes: EVERY leaf here
+  // draws TWO lines — the true midpoint, then the endpoint — where 2.6.1 and
+  // the modern DDA draw ONE chord as soon as the arc is flat enough. One chord
+  // cuts inside the curve; two sit rounder. At em64 786 the modern rule almost
+  // never subdivides at all, so this is the only era with real leverage.
+  //
+  // conicLevel: FreeType sets ras.conic_level = 32 and doubles it once the
+  // bitmap exceeds 24 px on a side. A producer rasterizing one glyph gets a
+  // glyph-sized bitmap (~8..13 px here), so 32 is the value that models it —
+  // NOT the 48 px scratch window ftclone happens to render into.
+  conicToFT240(cx6, cy6, tx6, ty6, conicLevel = 32) {
+    const DOWNSCALE = x => x >> 2;
+    const div = (a, b) => Math.trunc(a / b);
+    let dx = Math.abs(DOWNSCALE(this.x) + tx6 - 2 * cx6);
+    const dy = Math.abs(DOWNSCALE(this.y) + ty6 - 2 * cy6);
+    if (dx < dy) dx = dy;
+    let level = 1;
+    dx = div(dx, conicLevel);
+    while (dx > 0) { dx >>= 2; level++; }
+
+    const drawLeaf = (toX, toY, cX, cY) => {
+      this.lineTo(div(this.x + toX + 2 * cX, 4), div(this.y + toY + 2 * cY, 4));
+      this.lineTo(toX, toY);
+    };
+    if (level <= 1) { drawLeaf(UPSCALE(tx6), UPSCALE(ty6), UPSCALE(cx6), UPSCALE(cy6)); return; }
+
+    const A = [];
+    for (let k = 0; k < 32 * 2 + 5; k++) A.push({ x: 0, y: 0 });
+    A[0].x = UPSCALE(tx6); A[0].y = UPSCALE(ty6);
+    A[1].x = UPSCALE(cx6); A[1].y = UPSCALE(cy6);
+    A[2].x = this.x; A[2].y = this.y;
+    const levels = new Int32Array(64);
+    levels[0] = level;
+    let top = 0, ai = 0;
+    const half = (p, q) => div(p + q, 2);
+    const split = i => {
+      let a, b;
+      A[i + 4].x = A[i + 2].x;
+      b = A[i + 1].x;
+      a = A[i + 3].x = half(A[i + 2].x, b);
+      b = A[i + 1].x = half(A[i].x, b);
+      A[i + 2].x = half(a, b);
+      A[i + 4].y = A[i + 2].y;
+      b = A[i + 1].y;
+      a = A[i + 3].y = half(A[i + 2].y, b);
+      b = A[i + 1].y = half(A[i].y, b);
+      A[i + 2].y = half(a, b);
+    };
+    while (top >= 0) {
+      const lv = levels[top];
+      if (lv > 1) {
+        let min = A[ai].y, max = A[ai].y;
+        for (const k of [1, 2]) { const y = A[ai + k].y; if (y < min) min = y; if (y > max) max = y; }
+        if (!(TRUNC(min) >= this.H || TRUNC(max) < 0)) {
+          split(ai); ai += 2; top++;
+          levels[top] = levels[top - 1] = lv - 1;
+          if (ai + 4 >= A.length) for (let k = 0; k < 6; k++) A.push({ x: 0, y: 0 });
+          continue;
+        }
+      }
+      drawLeaf(A[ai].x, A[ai].y, A[ai + 1].x, A[ai + 1].y);
+      top--; ai -= 2;
+    }
+  }
+  // gray_render_conic as it stood in FreeType 2.4.12 .. 2.6.2 — RECURSIVE
+  // midpoint subdivision, not the DDA below. Verbatim from
+  // freetype-2.6.1/src/smooth/ftgrays.c, PIXEL_BITS 8 / ONE_PIXEL 256, the
+  // same context ftclone renders in. Straight and diagonal segments never
+  // reach this function, which is why they are the built-in control.
+  conicToFT261(cx6, cy6, tx6, ty6) {
+    const A = [];
+    for (let k = 0; k < 32 * 2 + 5; k++) A.push({ x: 0, y: 0 });
+    let ai = 0;
+    A[0].x = UPSCALE(tx6); A[0].y = UPSCALE(ty6);
+    A[1].x = UPSCALE(cx6); A[1].y = UPSCALE(cy6);
+    A[2].x = this.x; A[2].y = this.y;
+    const levels = new Int32Array(64);
+    let top = 0;
+
+    let dx = Math.abs(A[2].x + A[0].x - 2 * A[1].x);
+    const dy = Math.abs(A[2].y + A[0].y - 2 * A[1].y);
+    if (dx < dy) dx = dy;
+
+    let draw = false;
+    if (dx < ONE_PIXEL / 4) draw = true;
+    else {
+      // short-cut the arc that crosses the current band
+      let min = A[0].y, max = A[0].y;
+      for (const k of [1, 2]) { const y = A[k].y; if (y < min) min = y; if (y > max) max = y; }
+      if (TRUNC(min) >= this.H || TRUNC(max) < 0) draw = true;
+    }
+
+    // gray_split_conic — C integer division truncates toward zero
+    const half = (p, q) => Math.trunc((p + q) / 2);
+    const split = i => {
+      let a, b;
+      A[i + 4].x = A[i + 2].x;
+      b = A[i + 1].x;
+      a = A[i + 3].x = half(A[i + 2].x, b);
+      b = A[i + 1].x = half(A[i].x, b);
+      A[i + 2].x = half(a, b);
+      A[i + 4].y = A[i + 2].y;
+      b = A[i + 1].y;
+      a = A[i + 3].y = half(A[i + 2].y, b);
+      b = A[i + 1].y = half(A[i].y, b);
+      A[i + 2].y = half(a, b);
+    };
+
+    if (!draw) {
+      let level = 0;
+      do { dx >>= 2; level++; } while (dx > ONE_PIXEL / 4);
+      levels[0] = level;
+    }
+    for (;;) {
+      if (!draw && levels[top] > 0) {
+        const level = levels[top];
+        split(ai); ai += 2; top++;
+        levels[top] = levels[top - 1] = level - 1;
+        if (ai + 4 >= A.length) for (let k = 0; k < 6; k++) A.push({ x: 0, y: 0 });
+        continue;
+      }
+      draw = false;
+      this.lineTo(A[ai].x, A[ai].y);
+      top--; ai -= 2;
+      if (top < 0) return;
+    }
+  }
   // gray_render_conic, DDA (FT_INT64) variant. control/to in 26.6!
   conicTo(cx6, cy6, tx6, ty6) {
     const p0x = this.x, p0y = this.y;
@@ -239,6 +413,11 @@ export class FTClone {
     // FT loads at char size 65536/64 = 1024pt @72dpi: scale16.16 = DivFix(65536, upm)
     this.scale16 = divfix(65536, this.upm);
     this.cache = new Map();
+    // Which era's gray_render_conic to walk. 'dda' is FreeType 2.10+, the one
+    // certify.mjs proves against mupdf 1.28 — the default, always. 'ft261' is
+    // the 2.4.12..2.6.2 recursive-subdivision rule, for producers older than
+    // that certification. Straight and diagonal segments bypass both.
+    this.conicEra = 'dda';
   }
   setGidMap(map) { this.gidMap = map; }
   // coverage buffer for glyph cp at matrix [em64x,0,0,-em64y]/64 pen (px64,py64)/64
@@ -296,6 +475,11 @@ export class FTClone {
         i--;
       }
       R.moveTo(UPSCALE(vStart.x), UPSCALE(vStart.y));
+      const CL = this.conicLevel ?? 32;
+      const CONIC = this.conicEra === 'ft261' ? (a, b, c, d) => R.conicToFT261(a, b, c, d)
+        : this.conicEra === 'ft28' ? (a, b, c, d) => R.conicToFT28(a, b, c, d)
+        : this.conicEra === 'ft240' ? (a, b, c, d) => R.conicToFT240(a, b, c, d, CL)
+        : (a, b, c, d) => R.conicTo(a, b, c, d);
       let closedByConic = false;
       while (i < limit) {
         i++;
@@ -305,13 +489,13 @@ export class FTClone {
         while (i < limit) {
           i++;
           const vec = pts[i];
-          if (vec.on) { R.conicTo(vControl.x, vControl.y, vec.x, vec.y); done = true; break; }
+          if (vec.on) { CONIC(vControl.x, vControl.y, vec.x, vec.y); done = true; break; }
           const vMiddle = { x: half(vControl.x, vec.x), y: half(vControl.y, vec.y) };
-          R.conicTo(vControl.x, vControl.y, vMiddle.x, vMiddle.y);
+          CONIC(vControl.x, vControl.y, vMiddle.x, vMiddle.y);
           vControl = vec;
         }
         if (!done) {          // ran out of points: close with conic to start
-          R.conicTo(vControl.x, vControl.y, vStart.x, vStart.y);
+          CONIC(vControl.x, vControl.y, vStart.x, vStart.y);
           closedByConic = true;
           break;
         }

@@ -117,8 +117,11 @@ export const SETS = [
   // at em64 786 = 12.28125 px, plain FZ blend, ¼-px x pens, integer y — a
   // PER-USER font install (%LOCALAPPDATA%/Microsoft/Windows/Fonts), which is
   // why 39 faces were "refuted" before it. **NOT a certified family**: it is
-  // the right face in the wrong BUILD, so polygon glyphs are byte-exact but
-  // curve glyphs miss by 2–4 (`t` by 7 on real pages, `D` by 13). Measured on
+  // the right face in the wrong BUILD, and the split is exactly the presence of
+  // OFF-CURVE POINTS — the byte-exact glyphs (K L T X Y Z w x) have none, every
+  // curved glyph misses, and hinting and the rasterizer are both refuted as
+  // causes (lab/families.mjs `dejavuserif786` carries the measurements).
+  // Curve glyphs miss by 2–4 (`t` by 7 on real pages, `D` by 13). Measured on
   // EFTA01150379 as glyphs/(glyphs+□) — the tol-0 share depends
   // strongly on page type, so quote both: grid p900 **65.0 %** at tol 0 /
   // 94.8 % at tol 4, prose p1 **49.8 %** / 94.5 % (98.6 % at tol 16 on both).
