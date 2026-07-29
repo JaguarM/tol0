@@ -377,6 +377,78 @@ export const FAMILIES = [
   //      rational 8/25 downscale, whose output period is the 8 px of (1).
   //      Corroborating: 63% of horizontal ink runs measure 1.25–1.30 px
   //      = 4 source pixels at 300 dpi, the next cluster exactly 3.
+  //   4. THE CONTROL ROW for (1), drawn 2026-07-29 (eighth session). (1) was
+  //      argued from the lattice's construction and never measured, because no
+  //      tol-0-readable document supplies the subject: DJ840's narrowest
+  //      connected component is FOUR columns — DejaVu Serif's serifs mean an
+  //      `l` is never a bare stem. So `ubuntu-kit/synthramp.mjs` DRAWS both
+  //      arms, same prose and same sans face, at the subject's own stroke
+  //      geometry (11 rows, 276 ink/row), differing only in pipeline:
+  //
+  //        pen lattice @ 96 dpi         amp 0.027   0.73x null   p 0.82  FLAT
+  //        the same @ 300 dpi, then
+  //          box-resampled 8/25         amp 0.130   3.03x null   p 0.0005 RAMP
+  //        EFTA02715081                 amp 0.119   2.88x null   p 0.0010 RAMP
+  //
+  //      and the subject's 8-bin waveform matches the FORWARD control's at
+  //      r = +0.855, MAX OVER THE 8 CYCLIC SHIFTS (every other shift ≤ +0.27;
+  //      a shift is only where the page origin sits in the resample cycle, so
+  //      maximising over it is the right test — but it is a look-elsewhere of
+  //      8 and the figure is quoted as such. The gap to the runner-up, not the
+  //      peak, is what makes it safe). (1) is now measured in both directions.
+  //
+  //      Two corrections fell out of it. RAW AMPLITUDE IS NOT COMPARABLE
+  //      BETWEEN DOCUMENTS: the first control, run at the corpus stroke size,
+  //      scored amplitude 0.105 against the subject's 0.119 and was FLAT
+  //      anyway (p = 0.16) — its splits are 2.4× more spread, so its null sits
+  //      at 0.081 instead of 0.041. Always quote amplitude ×its own null.
+  //      And THE SOURCE IS NOT BITONAL: the arm that reproduces the
+  //      fingerprint renders GRAYSCALE, which agrees with the mid-tone census
+  //      (the 17 run 85% mid-tone/ink, as antialiased as the readable family).
+  //      That supersedes the word "bitonal" in the action below, struck in the
+  //      same session.
+  //
+  //      Excluded there too, and it was a live confound rather than a
+  //      formality: JPEG's 8×8 DCT blocks are period 8 in absolute x as well,
+  //      and would have explained the whole statistic with no resample at all.
+  //      Census over lab/base64/: 40 PDFs, 5083 pages, 5083 image XObjects —
+  //      exactly one per page — and ZERO /DCTDecode. 5080 are /FlateDecode
+  //      8 bpc bare /DeviceGray; the only 3 /Indexed (over /DeviceRGB) are
+  //      colour pages of one jitter-family document, in neither family here.
+  //      No lossy step anywhere in the container, so the period-8 signal
+  //      cannot be block artifacts.
+  //        (Read "indexed" in a first draft of this entry: that came from
+  //        grepping /ColorSpace and mistaking the OBJECT REFERENCE for a name.
+  //        Resolved, it is bare /DeviceGray, which agrees with the banked
+  //        assembly profile's "8 bpc gray" — corrected the same session.
+  //        Colourspace DECLARATION STYLE is part of the container fingerprint
+  //        that the version pin will be argued from, so it has to be right.)
+  //
+  //   5. The burned `_R1_` Bates band (image rows 1058–1071, below the body's
+  //      last ink at 1006) carries the SAME resample damage as the body of its
+  //      own page. Pure-black share of ink — a crisp 96 dpi render saturates
+  //      stem interiors, a downscale mixes them away — is 0.131 % in the band
+  //      against 0.077 % in the body, where the lattice controls run 3.3 %
+  //      (DJ840) and 6.9 % (synthetic): a 25–50× gap, self-controlled within
+  //      one image. So the band was already in the ~300 dpi source and went
+  //      through one downscale with everything else; it is not a 96 dpi
+  //      overlay applied afterwards.
+  //      STATE THE CLAIM ON THE GAP, NOT ON AGREEMENT: the instrument is
+  //      coarse. The forward 8/25 control sits at 0.378 %, itself ~5× above
+  //      the subject's own body at 0.077 %, so control and subject do NOT
+  //      agree quantitatively and nothing here should be read as if they did.
+  //      What carries the verdict is the CATEGORICAL gap between the resampled
+  //      regime (0.08–0.38 %) and the lattice regime (3.3–6.9 %) — an order of
+  //      magnitude and a half, with band and body on the same side of it.
+  //      NOTE the statistic that does NOT work here, because it looks like it
+  //      should: raster DIVERSITY is confounded for a fixed-position stamp. A
+  //      Bates line sits at the same absolute x on all 58 pages, and same
+  //      content at same x gives one raster under a pen lattice AND under a
+  //      fixed-grid resample. Measured: the fixed prefix buckets give exactly
+  //      1 distinct raster over 58 pages, while a 22×11 bucket gives 26
+  //      distinct rasters at a SINGLE x — merged digits whose content changes
+  //      as the number increments. Neither number is about the pipeline.
+  //      `phaseramp` on the band refuses (0 two-column stems): guard working.
   //
   // So the page is not a per-pixel function of ANY 1× coverage map, and no
   // (face, em64, pen, law) can reproduce it — which is why every roster miss
@@ -389,8 +461,8 @@ export const FAMILIES = [
   // sweep at 4096 pens × 4 laws over em64 920..960.
   { name: 'page-downscale-816x1073', renderable: false,
     fingerprint: '816×1073 pages (MediaBox 612×804.75 pt); sub-pixel phase tracks x mod 8, and one glyph shape has ~1800 distinct rasters where a 4-phase producer has 4',
-    action: 'NOT a face hunt, and a wider roster will not close it — the pixels are a 300 dpi bitonal source area-averaged 8/25 down to 96 dpi. Tolerance 0 is reachable only by reproducing THAT: rasterize bilevel at 3.125× and apply the same box resample. Until someone builds that, these documents have no pool and no □-free read. Do NOT widen a roster or loosen a tolerance against them.',
-    record: '17 documents in lab/base64/unidentified/; measured on EFTA02715081 (58 pp)' },
+    action: 'NOT a face hunt, and a wider roster will not close it — the pixels are a 300 dpi GRAYSCALE source area-averaged 8/25 down to 96 dpi ("bitonal" here until 2026-07-29, refuted by the mid-tone census and by the grayscale control that reproduces the fingerprint). Tolerance 0 is reachable only by reproducing THAT: rasterize antialiased at 3.125× and apply the same box resample. Until someone builds that, these documents have no pool and no □-free read. Do NOT widen a roster or loosen a tolerance against them.',
+    record: '17 documents in lab/base64/unidentified/; (1) and (4) measured on EFTA02715081 (58 pp, 475–477 two-column stems at every height floor 3..8). (2) says 40 pages, so it is one of the OTHER 15 — and the 666-stem figure once quoted for (1) is likewise not this document. Which one went unrecorded; the entry conflates at least two.' },
   { name: 'verdana-jitter-partial', renderable: false,
     fingerprint: 'mode-3 colour fax pages, verdana@1024 (≡ REFSAN.TTF), m-bank exact 40/40 — but the reader leaves ~⅓ of the bands unread',
     action: 'OPEN, and it is the READ that is open, not the face. tol 0 fails wholesale (2032 □) and tol 1 reads (44 □), which is the registered `jpeg-jitter` law, so the tolerance is justified rather than tuned. What is NOT explained: of 117 ink bands over 3 pages only 80 become lines. Band-picking 853/896 beside 1024 changes nothing (identical 80 lines / 4649 glyphs / 44 □), so the remainder is not a second SIZE — look for a second face, a stamp, or a fax header before widening anything. Do NOT add a glyph-registry pool until a document reads clean; a pool is a proven recipe.',

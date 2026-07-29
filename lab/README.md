@@ -76,7 +76,7 @@ so the bank must **refuse** it at tolerance 0 rather than guess.
 The corpus is not distributed, so on a fresh clone the selftest skips. It says
 so, and **skipping is not a pass**.
 
-## Three things that are easy to get wrong here
+## Five things that are easy to get wrong here
 
 **The overlay is evidence, not truth.** `words.json` is the producer's own OCR.
 It misreads, and its per-character advances are stretched to fit the ink, so
@@ -96,6 +96,27 @@ For a proportional face, use route 1: mbank → `fontgen` → read.
 enumerated when it finds nothing, and `identify.mjs` counts the families it
 could not even try, because a face that is not installed is not a face that is
 refuted ([METHOD rule 3](../docs/METHOD.md)).
+
+**Scope every "all pages / every document" claim to the family you measured, at
+the time you write it.** A fact measured on one family gets compressed into a
+corpus-wide one the moment it is summarised, and the summary is what the next
+session believes. It has cost twice: "lossless FlateDecode, so byte-exactness
+is reachable" (true of the container, said of the pipeline), and "every page
+carries two Bates numbers on two layers" (true of the 17, false of the readable
+family — which carries no burned band at all, and a whole test was planned on
+the compressed version). Write the family into the sentence, not into the
+paragraph above it.
+
+**An effect size is never comparable across documents — quote it ×its own
+null.** Anything measured per-document (a phase ramp, a mid-tone share, an
+observations-per-raster ratio) scales with that document's own spread and *n*,
+so two raw numbers side by side compare nothing. It has now cost twice: the
+mid-tone lead was one page against one page unnormalised, and a lattice-drawn
+control scored ramp amplitude 0.105 against a suspect document's 0.119 while
+being **flat** (p = 0.16) — its splits were 2.4× more spread, putting its null
+at 0.081 instead of 0.041. `ubuntu-kit/phaseramp.py` prints `split sd`, `null
+amplitude` and `×null` for exactly this reason. A statistic with no null is a
+statistic with no verdict.
 
 ## Deliberately not here
 
