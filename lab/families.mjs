@@ -318,6 +318,67 @@ export const FAMILIES = [
   //     all — swapping DDA for the 2.6.1 rule changes 'o' by ZERO bytes — so
   //     the era simply has no leverage on a 12.28 px glyph.
   //
+  // ---- MECHANISM FOUND 2026-07-29. The font was never a different FONT. ----
+  // It is stock DejaVu Serif put through a QUAD -> CUBIC -> QUAD round trip on
+  // the 2048 grid, which perturbs only curves and leaves every straight segment
+  // untouched — which is why the partition below looked like a build
+  // difference for so long:
+  //
+  //   materialize the implied half-integer boundaries, round HALF-UP
+  //   elevate per segment  C1 = P + ⅔(Q−P),  C2 = R + ⅔(Q−R), round half-up
+  //   convert back         q1 = (3·C1 − P) >> 1
+  //                        q2 = (3·C2 − R) >> 1
+  //                        Q' = (q1 + q2) >> 1
+  //   then a STALE hmtx: the bbox was recomputed and hmtx was not, so the
+  //   renderer shifts each glyph by (lsb − xMin_new).
+  //
+  // Verified here by reimplementing it from that description alone and
+  // measuring on 5,172 ISOLATED page components — a set the Ubuntu session
+  // never saw:
+  //     stock DejaVu Serif 2.34         51.7%   kit refs: control 27/27 target  0/47
+  //     round trip                      85.2%             control 27/27 target 23/47
+  //     round trip + stale hmtx         98.5%             control 27/27 target 34/47
+  //     round trip WITHOUT the rounding 51.7%             control 27/27 target  0/47
+  // That last row is the control that matters: elevation followed by
+  // back-conversion is algebraically the identity, so with rounding disabled it
+  // must return to baseline exactly — and it does. The entire effect is the
+  // grid rounding, not the reimplementation.
+  //
+  // GRADE: recreation confirmed as MECHANISM by independent reimplementation
+  // with the rounding-off identity control; EXACT on audited clean windows;
+  // 98.5% on the raw isolated census with the residual dispositioned below and
+  // no curve-attributable crack found.
+  //
+  // Residual disposition — all 78, and the answer is that none of them is the
+  // law's. The Ubuntu corpus run's structural claim is BIMODALITY: a window
+  // reads at 0 or misses far, never by a few grey levels. Confirmed here on
+  // three sets, and the near band is empty in every one:
+  //     raw isolated census   78 miss:  1-10 → 0,  11-50 → 0,  51-211 → 0,  ≥212 → 78
+  //     their refs-clean       0 miss (58 exact, 2 no-dims → reconciles their 60/60)
+  //     their refs-held        3 miss, all ≥212 (l, l, g — l is a catalogued homoglyph)
+  // 42 of the 78 are COMMON-MODE — byte-identical diff under stock and under
+  // the law font — so the transform provably never touched them; they are
+  // concentrated in M and N, which are polygon-only. The other 36 are all far
+  // misses, consistent with contamination or homoglyph labels (0/O, 1/l//, I/l)
+  // and not with a crack, which would land in the near band.
+  //
+  // ARTIFACT WARNING. `ubuntu-kit/sweep-hits/SELFTEST-gridtrip.ttf` is NOT the
+  // law font: 56.0% raw census, 5/47 target. Identified as an earlier vintage —
+  // it differs from stock on 1792 glyphs where the law differs on 1987, and its
+  // stale-hmtx set is {d,e,q}, missing the S the law names. It is NOT the
+  // reversed-contour decoy (sign(5) and sign(S) match stock). Two guards follow
+  // from that and are worth keeping: a self-test or decoy artifact must never
+  // share a namespace with a deliverable, and a claimed-solved state must ship
+  // a checksum-named object rather than a pointer into a scratch directory.
+  // The deliverable here is `lab/base64/dejavuserif786-law-75707371a24d48cf.ttf`
+  // (sha256 75707371a24d48cf…), regenerable by `lab/base64/gridtrip-recipe.mjs`.
+  //
+  // Divergence still open: this reimplementation is close to the Ubuntu law but
+  // not bit-identical — its natural stale-hmtx set is {6,C,O,Q,S,d,e,g,q} where
+  // the law names {S,d,e,q}, and 'o' back-converts to 383 here against SELFTEST's
+  // 384. Since the near band is empty either way, the divergence is in rounding
+  // detail, not in the mechanism.
+  //
   // Where that leaves it. Face, em64, blend law and pen lattice are PROVEN —
   // thousands of straight-sided instances are byte-exact and nothing else on a
   // 1,253-face roster reproduces even one. Upstream geometry (to the first
