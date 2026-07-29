@@ -21,9 +21,11 @@ fact you need:
 
 **The documentation is deliberately these files and no more.** A new fact goes
 in the one whose kind it is, or in the code comment that owns it — not in a new
-document. `docs/PLAN.md` is cancelled, not deferred. `lab/` is eight files plus
+document. `docs/PLAN.md` is cancelled, not deferred. `lab/` is nine files plus
 `rust/` and stays that shape: a new tool needs to justify itself against the
-one already there.
+one already there. (The ninth, `transform.mjs`, earned it — a producer's
+TRANSPORT law is a fifth identity axis the other eight had nowhere to put, and
+it is the reproducer for the `dejavuserif786law` pool's font.)
 
 ## Two rules that override everything else
 

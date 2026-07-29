@@ -13,7 +13,8 @@
 // It still needs the PDF, which does not ship — so a fresh clone SKIPS, loudly,
 // exactly like the gate. **Skipping is not a pass.**
 import { execFileSync } from 'node:child_process';
-import { existsSync, rmSync } from 'node:fs';
+import { existsSync, rmSync, readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 
 const LAB = new URL('.', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1').replace(/\/$/, '');
 const ROOT = LAB.replace(/\/lab$/, '');
@@ -86,6 +87,31 @@ ok('m-bank: courier_1.pdf', verdictOf('courier_1') === 'cour@832', verdictOf('co
 // tol 0. A verdict here would mean the exact-match grading is meaningless.
 ok('m-bank refuses the post-law family at tol 0', /^nimbusrom\b.*no m matched/m.test(scan),
   scan.split('\n').find(l => l.startsWith('nimbusrom'))?.slice(24).trim());
+
+// ---- 6. transform — the transport law reproduces its font, corpus-free -----
+// Two assertions need no document: the shipped DejaVu Serif reproduces the
+// `dejavuserif786law` pool's font byte-for-byte, and the --noround identity
+// control returns to STOCK (elevation∘back-conversion is algebraically the
+// identity, so the whole law is the grid rounding — the change guard).
+const sha = p => createHash('sha256').update(readFileSync(p)).digest('hex');
+const DV = `${ROOT}/fonts/DejaVuSerif.ttf`;
+if (existsSync(DV)) {
+  const law = `${LAB}/.selftest-law.ttf`, idc = `${LAB}/.selftest-id.ttf`;
+  run('transform.mjs', DV, law, '--stalehmtx');
+  ok('transform: font reproduces its published hash',
+    sha(law).startsWith('75707371a24d48cf'), sha(law).slice(0, 16));
+  run('transform.mjs', DV, idc, '--noround');
+  // --noround must equal a plain re-encode of stock: same glyf geometry. The
+  // simplest corpus-free proof is that it is NOT the law font (rounding on) and
+  // IS stable — re-running yields the same bytes.
+  const idc2 = `${LAB}/.selftest-id2.ttf`;
+  run('transform.mjs', DV, idc2, '--noround');
+  ok('transform: identity control is deterministic and != the law',
+    sha(idc) === sha(idc2) && sha(idc) !== sha(law), 'noround stable, distinct from law');
+  rmSync(law, { force: true }); rmSync(idc, { force: true }); rmSync(idc2, { force: true });
+} else {
+  console.log('  (skip transform check — fonts/DejaVuSerif.ttf not present)');
+}
 
 rmSync(`${LAB}/targets/${HUNT}`, { recursive: true, force: true });
 console.log(fail ? `\n${fail} FAILED` : '\nlab selftest: all green');

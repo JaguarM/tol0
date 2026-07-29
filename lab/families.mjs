@@ -371,13 +371,57 @@ export const FAMILIES = [
   // share a namespace with a deliverable, and a claimed-solved state must ship
   // a checksum-named object rather than a pointer into a scratch directory.
   // The deliverable here is `lab/base64/dejavuserif786-law-75707371a24d48cf.ttf`
-  // (sha256 75707371a24d48cf…), regenerable by `lab/base64/gridtrip-recipe.mjs`.
+  // (sha256 75707371a24d48cf…), regenerable by `node lab/transform.mjs
+  // fonts/DejaVuSerif.ttf out.ttf --stalehmtx` — the transport law, tracked.
   //
-  // Divergence still open: this reimplementation is close to the Ubuntu law but
-  // not bit-identical — its natural stale-hmtx set is {6,C,O,Q,S,d,e,g,q} where
-  // the law names {S,d,e,q}, and 'o' back-converts to 383 here against SELFTEST's
-  // 384. Since the near band is empty either way, the divergence is in rounding
-  // detail, not in the mechanism.
+  // PIN RESOLVED 2026-07-29, and it is NOT an equivalence class — the corpus
+  // discriminates the candidate maps by 46 points. The disagreeing operation is
+  // the BACK-CONVERSION ROUNDING, localized by running the archived
+  // ubuntu-kit/gridtrip.py on Windows and diffing its glyf against this one:
+  //
+  //   floor, two-arm — q = (3C−P) >> 1 each, then Q = (q1+q2) >> 1   98.5%
+  //   their `c2` / qround down                                       58.6%
+  //   their `c1` / qround down                                       58.5%
+  //   their `avg` and `pickax` / down                                54.4%
+  //   their `mid` / up  (r_up per arm, then average)                 51.8%
+  //   stock DejaVu Serif 2.34                                        51.7%
+  //
+  // Confirmed by substitution rather than inference: switching ONLY the arm
+  // rounding in this implementation from >>1 to r_up reproduces their geometry
+  // character for character ('o' first off-curve 765 vs stock 764 vs 763 here,
+  // materialized midpoint 840,187 identical in both) and drops the score to
+  // 51.8%, matching their cell. So `expand` is not the pin; the arm rounding is.
+  //
+  // The circulated recipe text — "q1=(3C1−P0)>>1; q2=(3C2−P3)>>1; Q=(q1+q2)>>1"
+  // — is therefore literally correct, and is NOT any member of gridtrip.py's
+  // `BACK` dict: `back_mid` is the nearest in shape but rounds each arm half-up
+  // and averages in float.
+  //
+  // CONCORDANCE, and the fork was illusory. `ubuntu-kit/backlaw.py` — whose own
+  // docstring opens "THIS FOUND THE LAW" and states the three shifts verbatim as
+  // cell `two-hdn` (== `two-floor`; every intermediate is an integer or an exact
+  // half, so half-down IS floor IS >>1) — was run here and agrees with this
+  // reimplementation on all three pre-registered predictions:
+  //     (i)   contour geometry byte-identical on 65 of 65 base64 glyphs
+  //     (ii)  full-font stale-hmtx set {6,C,O,Q,S,d,e,g,q}, exactly
+  //     (iii) identical scores in every cell — refs-clean 25/25 + 33/35,
+  //           refs-held 61/71, kit refs 27/27 + 34/47, raw census 98.5%
+  // So `gridtrip.py` is a STALE VINTAGE of the same class as SELFTEST, and its
+  // per-glyph "arm" was withdrawn in-session: backlaw.py records that the arm
+  // was entirely the hmtx confound (fontTools recomputes a bbox on save and
+  // leaves hmtx alone, so rounding a glyph's leftmost point inward silently
+  // translates it by +1), that `two` equals min(c1,c2) on 45,612 of 45,612
+  // axis-values, and that a 208-bit per-segment arm ORACLE loses to this 0-bit
+  // law because the decision is per AXIS. The law is parameter-free. Its
+  // {S,d,e,q} was the fitted-corpus scope of the same set measured full-font
+  // here — one clause, not two.
+  //
+  // GUARD, learned the expensive way: this time the PROSE handoff was exact and
+  // the CODE archive was lossy, because the prose was written at session end
+  // while the gitignored kit silently carried older vintages. Archived code must
+  // be regenerated or content-stamped at session end the same way deliverables
+  // are; a kit that survives sessions but not edits is a second SELFTEST waiting
+  // to happen.
   //
   // Where that leaves it. Face, em64, blend law and pen lattice are PROVEN —
   // thousands of straight-sided instances are byte-exact and nothing else on a

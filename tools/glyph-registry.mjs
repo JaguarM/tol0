@@ -129,6 +129,16 @@ export const SETS = [
   // as tol-graded, not byte-exact.
   // No POOLS/BATCH_LADDER entry for exactly that reason.
   ['dejavuserif786', 'dejavuserif_786.npz'],
+  // The same document under the RECREATED PRODUCER TRANSPORT LAW (2026-07-29).
+  // Not a different face — stock DejaVu Serif 2.34 put through the producer's
+  // quad→cubic→quad round trip on the 2048 grid. See lab/families.mjs
+  // `dejavuserif786` for the law, its independent reimplementation, and the
+  // backlaw.py concordance. 51.7% → 98.5% byte-exact on the raw isolated
+  // census; the residual carries no near-band member, i.e. no curve-attributable
+  // failure. PROVENANCE src is 'transform-derived' — a category of its own,
+  // because the pixels come from a font this repo SYNTHESIZED, not from one it
+  // or the system ships.
+  ['dejavuserif786law', 'dejavuserif786law.npz'],
   ['times13', 'times_13.npz'],
   ['times16', 'times_16.npz'],
   ['timesbd16', 'timesbd_16.npz'],
@@ -210,11 +220,59 @@ export const POOLS = {
   // tol-0 doc above is byte-identical under it.
   tahomaJitter: { glyphs: 'tahoma853+tahomabd853,tahoma832+tahomabd832,tahoma1024+tahomabd1024,segoeui853+segoeuib853',
     tol: 1 },
-  // NOTE: `dejavuserif786` deliberately has NO pool and NO ladder rung — see
-  // its SETS comment. It is the right face in the wrong build, so it reads at
-  // tol 4, and POOLS means "certified family read command". Reproduce its read
-  // explicitly instead:
+  // NOTE: the STOCK `dejavuserif786` still has no pool and no ladder rung — it
+  // is the right face without the producer's transport law, reads at tol 4, and
+  // POOLS means "certified family read command". Reproduce it explicitly:
   //   blind-read --glyphs dejavuserif786 --tol 4
+  //
+  // The 11th pool. EFTA01150379 read at TOLERANCE 0 once the producer's
+  // transport law is applied to the face — lab/families.mjs `dejavuserif786`
+  // has the law, its independent reimplementation, and the backlaw.py
+  // concordance. Measured 2026-07-29 on this set:
+  //     p2 (prose)   stock 285 glyphs / 278 □   →   law 2,575 glyphs / 1 □
+  //     p20..p25     70 lines / 5,320 glyphs / 0 □ each, six pages running
+  //     WHOLE DOC    169,846 lines / 12,901,175 glyphs / 61 □  (□ rate 5e-6)
+  //
+  // TERMINAL VALIDATION, pre-registered before the read: the MIME part
+  // `bclc.gif` decodes from the tolerance-0 transcript to 3,320 bytes whose
+  // GIF89a sub-block chain walks to the trailer at byte 3319 of 3319 — exactly
+  // the final byte, every length prefix consistent, image descriptor 254x49
+  // matching the logical screen. One wrong byte anywhere desynchronizes that
+  // chain. The label layer is nowhere in the loop, which is the whole point:
+  // the catalogued homoglyph confusions here (0/O, 1/l, I/l, /) are all inside
+  // the base64 alphabet, so a label-based read of this corpus was never
+  // trustworthy and a raster-exact one is.
+  //
+  // The second payload, `LM Federal.pdf` (%PDF-1.4, ~9.65 MB, tail line decodes
+  // to `startxref 9611828 %%EOF`), is a far longer chain — 169,378 base64 lines
+  // — and it does NOT close: 234 of its lines carry an internal space, the
+  // reader's mark for an unread cluster, so the stream is corrupt at exactly the
+  // 61 □. That is the pre-registered outcome and it is a READ GAP, not a law
+  // doubt: the near band is empty everywhere (no glyph misses by 1..211), so no
+  // □ is a misread, and each is one unread glyph in 12.9M breaking base64
+  // alignment locally. The GIF is the terminal validation because it happens to
+  // sit in a □-free region; closing the PDF needs those 61 glyphs read, which is
+  // a residual-disposition problem (below), not a law problem.
+  //
+  // RESIDUAL DISPOSITIONS, so no document carries an unexplained □:
+  //   - p2's one □ is NOT text. It is a 7px×363px repeating decorative rule at
+  //     y=496..502 — the `bclc.gif` banner rasterized inline — and the reader
+  //     correctly refuses to invent glyphs for non-text ink. (Disposition:
+  //     not-text / inline-image. Standalone read is deterministically 1 □; the
+  //     JSON shows it as an `unread: true` whole band, no failCols.)
+  //   - the whole-doc 61 □ are the same class plus contaminated components:
+  //     none is in the near band, so none is a misread; they cost the PDF its
+  //     end-to-end close and nothing else.
+  //   - on the Ubuntu refs-clean set this reimplementation scores 33/35, and
+  //     the 2 are the DIRTY windows carried forward from that record — one
+  //     ink-threshold disagreement and one homoglyph label error, neither a law
+  //     failure.
+  //
+  // The set carries PROVENANCE src 'transform-derived' and its reads carry that
+  // flag. Fail-safe by construction: at tol 0 with a 212-grey-level bimodal gap,
+  // a wrong law UNREADS, it cannot MISREAD — that would need two distinct
+  // glyphs to share an exact raster.
+  dejavuserif786law: { glyphs: 'dejavuserif786law', tol: 0 },
 };
 
 // batch-read probe ladder, in rung order: 'poolName' or { name, pool } when
@@ -238,7 +296,10 @@ export const APP_ROSTER = ['times16', 'timesbd16', 'timesi16', 'tnr8_16',
   // EFTA01150379's DejaVu Serif 786 — carried so the viewer can read that
   // 2,427-page base64/MIME document at all (nothing else touches it). Its
   // useful reads come from the ladder's tol rungs, not the tol-0 pass.
-  'dejavuserif786'];
+  'dejavuserif786',
+  // the same face under the recreated producer transport law — the set that
+  // takes that document to tolerance 0 (POOLS `dejavuserif786law`)
+  'dejavuserif786law'];
 
 
 // ---------------------------------------------------------------------------
@@ -354,6 +415,40 @@ export const PROVENANCE = {
   segoeui853: { src: 'system', font: 'segoeui.ttf', em64: 853, phasesY: '0' },
   segoeuib853: { src: 'system', font: 'segoeuib.ttf', em64: 853, phasesY: '0' },
   dejavuserif786: { src: 'free', font: 'DejaVuSerif.ttf', em64: 786, phasesY: '0' },
+  // ---- src 'transform-derived': pixels from a font THIS REPO SYNTHESIZED ----
+  // Distinct from file-provenance categories on purpose. 'system'/'free'/'build'
+  // name a font someone else shipped; this one names a stock face PLUS a
+  // reproducible transform, so the honest provenance is the pair. Regenerate
+  // with `node <recipe> fonts/DejaVuSerif.ttf out.ttf --stalehmtx`, then
+  // fontgen --font out.ttf --em64 786 --phases-y 0.
+  //   sourceFace  the stock face and version the law is applied TO
+  //   recipe      the transform, a TRACKED lab tool, content-hashed (a recipe is
+  //               an artifact too — the archived Ubuntu kit carried stale
+  //               vintages of exactly this kind of file, which cost a session to
+  //               detect, so the canonical one lives in git and is stamped)
+  //   font        the synthesized font, content-hashed and named by its hash
+  //   pin         which member of the candidate family this is, and what
+  //               adjudicated it
+  //   evidence    the independence controls, so the claim is auditable without
+  //               re-deriving it
+  // Regenerate the font (byte-identical): node lab/transform.mjs \
+  //   fonts/DejaVuSerif.ttf dejavuserif786-law-75707371a24d48cf.ttf --stalehmtx
+  dejavuserif786law: {
+    src: 'transform-derived', font: 'dejavuserif786-law-75707371a24d48cf.ttf',
+    em64: 786, phasesY: '0',
+    sourceFace: 'DejaVuSerif.ttf 2.34 (head.fontRevision 2.34000, upm 2048), stock',
+    recipe: 'lab/transform.mjs sha256 b21dbe4e9a9fc57f… (default flags + --stalehmtx)',
+    fontHash: 'sha256 75707371a24d48cf41f92b70c8082eaef553558f254a7cb308138f99ada0cc6d',
+    pin: 'PINNED BY CORPUS ADJUDICATION — 46-point raw-census margin over the ' +
+         'nearest alternative, localized by substitution to the back-conversion ' +
+         'arm rounding (>>1 floor, not half-up); concordant with ubuntu-kit/' +
+         'backlaw.py cell two-hdn on all three pre-registered predictions ' +
+         '(geometry 65/65, stale set {6COQSdegq}, every score cell)',
+    evidence: 'rounding-off identity control returns to baseline exactly; raw ' +
+              'isolated census 5094/5172 with an EMPTY near band (0 windows in ' +
+              '1..211); 42 of 78 residuals common-mode with stock',
+    flag: 'transform-derived — reads carry this until the decode validates',
+  },
   times13: { src: 'system', font: 'times.ttf', em64: 832, phasesY: '0,0.5' },
   times16: { src: 'system', font: 'times.ttf', em64: 1024, phasesY: '0,0.5' },
   timesbd16: { src: 'system', font: 'timesbd.ttf', em64: 1024, phasesY: '0,0.5' },

@@ -40,7 +40,13 @@
     // EFTA01150379's face (ocr/FINDINGS-b64grid.md): DejaVu Serif em64 786.
     // Right face, wrong BUILD — polygon glyphs byte-exact, curve glyphs off
     // 2–4 (`t` 7, `D` 13), so useful reads come from the ladder tol rungs.
-    'dejavuserif786'];
+    'dejavuserif786',
+    // …and the same face under the producer's recreated TRANSPORT LAW, which
+    // reads that document at TOLERANCE 0: p2 goes 285 glyphs / 278 □ on the
+    // stock set to 2,575 glyphs / 1 □ on this one, and six consecutive base64
+    // pages read 5,320 glyphs at 0 □. Both are carried — the stock set still
+    // names the face for anything the law does not cover.
+    'dejavuserif786law'];
   // "…/glyphs_times16.json" (legacy url) / "times16" -> "times16"
   const setName = s => s.replace(/^.*glyphs_/, '').replace(/\.json$/, '').replace(/^.*\//, '');
 
