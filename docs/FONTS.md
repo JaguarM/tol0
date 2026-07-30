@@ -2,7 +2,7 @@
 
 Short version: **this repo ships every font and glyph set it is allowed to ship,
 and tells you exactly how to rebuild the rest from your own machine.** A fresh
-clone has 13 of 75 glyph sets. That is not an oversight.
+clone has 13 of 76 glyph sets. That is not an oversight.
 
 ## Why a glyph set is a licence question
 
@@ -28,7 +28,7 @@ Every set's origin is in `PROVENANCE` in
 | class | n | ships? | how you get it |
 |---|---:|---|---|
 | `free` | 13 | **yes** | already here; face is in `fonts/` |
-| `system` | 47 | no | regenerate from your own stock system font |
+| `system` | 48 | no | regenerate from your own stock system font |
 | `build` | 9 | no | needs one *specific* font build, not the current install |
 | `corpus` | 6 | **never** | cut from document pixels — no reproduction path |
 
@@ -55,7 +55,7 @@ their faces draw its page and the same sets read it back.
 
 ### system — regenerate from your own fonts
 
-47 sets come from stock Windows fonts: Arial, Times New Roman, Courier New,
+48 sets come from stock Windows fonts: Arial, Times New Roman, Courier New,
 Tahoma, Segoe UI, Calibri, Cambria, Georgia, Verdana, Century Schoolbook.
 
 ```bash
@@ -139,7 +139,7 @@ something wrong. Only the `calibri` pool needs them.
   document, skipping **loudly** and never printing a green line for something it
   did not read.
 - `npm test` asserts every `free` set is present and makes **no** assertion about
-  the others — a fresh clone is *expected* to be missing 62 sets, and that must
+  the others — a fresh clone is *expected* to be missing 63 sets, and that must
   not read as a failure.
 
 ## The honest caveat

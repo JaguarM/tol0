@@ -11,7 +11,7 @@ supersedes. This repo's own "8 snap phases" survived months of work and is
 
 **2. A byte-identical regression gate beats a suite of assertions.** `npm run
 gate` re-reads 18 fixed documents and byte-compares whole transcripts against
-committed references: **33,736 lines, 2,436,238 glyphs, 40 □, 55 s**. The
+committed references: **33,736 lines, 2,436,253 glyphs, 32 □, 55 s**. The
 expected numbers *are the reference files*, so there is no threshold to argue
 about and any change in any number is the signal. It has caught every accidental
 regression, including one a plausible-looking simplification would have shipped

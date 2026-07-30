@@ -84,6 +84,7 @@ export const SETS = [
   ['nimbusrombdlin1194', 'nimbusrombdlin_1194.npz'], // "PROGRAM STATEMENT" spaced caps
   ['nimbussansbdlin1536', 'nimbussansbdlin_1536.npz'], // Nimbus Sans Bold 18pt cover title
   ['tnrlin1024', 'tnrlin_1024.npz'],                 // REAL Times New Roman (embedded subset): ■ bullets + curly quotes
+  ['tnrbdlin1024', 'tnrbdlin_1024.npz'],             // REAL TNR Bold companion: P5 heading tail `("DRY CELL" STATUS)` (2026-07-30)
   // court/ECF sub-family of the palette container (post: null, no linear) —
   // FINDINGS-nimbusrom.md §sub-family 2; body EXACT, bold/italic companions
   ['censcbk1198', 'censcbk_1198.npz'],               // Century Schoolbook 1198 — brief body
@@ -172,11 +173,11 @@ export const POOLS = {
   // Outside In 7516xx/7543xx/7569xx courier block (lab/families.mjs `nimbus791`)
   nimbus791: { glyphs: 'nimbus791' },
   // EFTA00039208 serif family, gate-certified command (lab/families.mjs `nimbusromlin1024`)
-  nimbusrom: { glyphs: 'nimbusromlin1024+nimbusrombdlin1024+nimbusromlin983+nimbusromilin1024+nimbusrombdlin1194+nimbussansbdlin1536+tnrlin1024',
+  nimbusrom: { glyphs: 'nimbusromlin1024+nimbusrombdlin1024+nimbusromlin983+nimbusromilin1024+nimbusrombdlin1194+nimbussansbdlin1536+tnrlin1024+tnrbdlin1024',
     palette: true, tol: 0 },
   // batch rung variant: + embedded-real-TNR linear sets seen across the wider
   // EFTA population (2026-07-21, 39421: 6209□ → 965□)
-  nimbusromWide: { glyphs: 'nimbusromlin1024+nimbusrombdlin1024+nimbusromlin983+nimbusromilin1024+nimbusrombdlin1194+nimbussansbdlin1536+tnrlin1024+timeslin16+timesilin16+timesbdlin16',
+  nimbusromWide: { glyphs: 'nimbusromlin1024+nimbusrombdlin1024+nimbusromlin983+nimbusromilin1024+nimbusrombdlin1194+nimbussansbdlin1536+tnrlin1024+tnrbdlin1024+timeslin16+timesilin16+timesbdlin16',
     palette: true, tol: 0,
     // probeMs 20s (10× a real P1 probe): on alien /Indexed docs (cleaned
     // scans) a plausible-looking LUT can send the engine into a near-endless
@@ -245,14 +246,30 @@ export const POOLS = {
   //
   // The second payload, `LM Federal.pdf` (%PDF-1.4, ~9.65 MB, tail line decodes
   // to `startxref 9611828 %%EOF`), is a far longer chain — 169,378 base64 lines
-  // — and it does NOT close: 234 of its lines carry an internal space, the
-  // reader's mark for an unread cluster, so the stream is corrupt at exactly the
-  // 61 □. That is the pre-registered outcome and it is a READ GAP, not a law
-  // doubt: the near band is empty everywhere (no glyph misses by 1..211), so no
-  // □ is a misread, and each is one unread glyph in 12.9M breaking base64
-  // alignment locally. The GIF is the terminal validation because it happens to
-  // sit in a □-free region; closing the PDF needs those 61 glyphs read, which is
-  // a residual-disposition problem (below), not a law problem.
+  // — and it does NOT close. ~~"corrupt at exactly the 61 □ … no □ is a
+  // misread"~~ — SUPERSEDED 2026-07-30, measured, and the correction is larger
+  // than the original claim: the read carries **259 SILENT L→I substitutions**
+  // (no □, no fail, pure-base64 body lines, all 259 verified fail-free).
+  // Mechanism, pixel-verified on p40 y54: 'I' is a strict ink-subset of 'L';
+  // where L's bottom arm meets a following tall letter (z/m/h/Z/n/k — the
+  // next-char histogram), the arm pixels go PENDING and the engine's
+  // acceptance score (ocr-engine scanLine: exact − 0.25·pending, pending>35%
+  // rejects) demotes the true L below the subset I; the leftover arm ink is
+  // absorbed without a fail. The truth-free signature is the pen trail: after
+  // a fake I the next glyph sits at adv(L) − adv(I) = 3.30 px past I's
+  // advance, and the whole-doc census (lab/base64/.gap-census.json, machine-
+  // local) finds exactly 259 such gaps — every [2.8,3.6]px gap in 12.73M glyph
+  // pairs is an 'I'. Independent corroboration with no pen data: the payload's
+  // 232 clean-length XMP metadata streams majority-vote to 34 disagreeing
+  // bytes — all at position 262, all '/'→'#', which is base64 'L'→'I'.
+  // So the near-band-empty argument was measuring the wrong channel: it rules
+  // out single-glyph byte misses, not composite-scan displacement. The GIF
+  // terminal validation stands — its run (pages 3..4) contains none of the
+  // 259 and no □ — but closing the PDF now needs the acceptance-rule defect
+  // fixed (an ENGINE issue, not a law issue), the 61 □ read, and the
+  // reconstruction's unread-band placement bug fixed (unread bands carry
+  // `top`, not `baseline`, and reconstruct-pdf.mjs sorted on baseline —
+  // 3 phantom erasure-lines inserted at wrong offsets + 2 displaced).
   //
   // RESIDUAL DISPOSITIONS, so no document carries an unexplained □:
   //   - p2's one □ is NOT text. It is a 7px×363px repeating decorative rule at
@@ -261,17 +278,22 @@ export const POOLS = {
   //     not-text / inline-image. Standalone read is deterministically 1 □; the
   //     JSON shows it as an `unread: true` whole band, no failCols.)
   //   - the whole-doc 61 □ are the same class plus contaminated components:
-  //     none is in the near band, so none is a misread; they cost the PDF its
-  //     end-to-end close and nothing else.
+  //     none is in the near band. (They are honest refusals; the 259 silent
+  //     substitutions above are a separate, unflagged channel.)
   //   - on the Ubuntu refs-clean set this reimplementation scores 33/35, and
   //     the 2 are the DIRTY windows carried forward from that record — one
   //     ink-threshold disagreement and one homoglyph label error, neither a law
   //     failure.
   //
   // The set carries PROVENANCE src 'transform-derived' and its reads carry that
-  // flag. Fail-safe by construction: at tol 0 with a 212-grey-level bimodal gap,
-  // a wrong law UNREADS, it cannot MISREAD — that would need two distinct
-  // glyphs to share an exact raster.
+  // flag. ~~"Fail-safe by construction: … a wrong law UNREADS, it cannot
+  // MISREAD — that would need two distinct glyphs to share an exact raster"~~ —
+  // SUPERSEDED 2026-07-30: true only of ISOLATED windows (the set has no
+  // byte-identical cross-char rasters — measured). The composite scan can
+  // misread without any shared raster: a subset glyph (I ⊂ L) matches its own
+  // ink exactly, the superset's extension goes pending at a junction, and the
+  // scorer prefers the subset. 259 proven instances in this one document. The
+  // law itself is untouched by this — it is the reader's acceptance rule.
   dejavuserif786law: { glyphs: 'dejavuserif786law', tol: 0 },
 };
 
@@ -393,6 +415,7 @@ export const PROVENANCE = {
   nimbusrombdlin1194: { src: 'free', font: 'NimbusRoman-Bold.cff', em64: 1194, phasesY: '0', linear: true },
   nimbussansbdlin1536: { src: 'free', font: 'NimbusSans-Bold.cff', em64: 1536, phasesY: '0', linear: true },
   tnrlin1024: { src: 'system', font: 'times.ttf', em64: 1024, phasesY: '0', linear: true, chars: '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~‘’“”–—…•■' },
+  tnrbdlin1024: { src: 'system', font: 'timesbd.ttf', em64: 1024, phasesY: '0', linear: true, chars: '!"#$%&\'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~‘’“”–—…•■' },
   censcbk1198: { src: 'system', font: 'CENSCBK.TTF', em64: 1198, phasesY: '0' },
   censcbkbd1198: { src: 'system', font: 'SCHLBKB.TTF', em64: 1198, phasesY: '0' },
   censcbki1198: { src: 'system', font: 'SCHLBKI.TTF', em64: 1198, phasesY: '0' },

@@ -22,7 +22,7 @@ tuple from pixels alone.
 | [docs/LAWS.md](docs/LAWS.md) | the measured physics every claim rests on — pen lattice, blend, producer post-laws, colour |
 | [docs/METHOD.md](docs/METHOD.md) | how this kind of problem is worked: eight rules that cost real time |
 | [docs/FONTS.md](docs/FONTS.md) | what ships, what you regenerate, and why a fresh clone has 13 of 75 glyph sets |
-| [fixtures/gate-ref/README.md](fixtures/gate-ref/README.md) | the gate's expected numbers, and all 40 □ looked at one by one |
+| [fixtures/gate-ref/README.md](fixtures/gate-ref/README.md) | the gate's expected numbers, and all 32 □ looked at one by one |
 | [lab/README.md](lab/README.md) | the other half — finding the producer of a document nobody has read yet |
 
 ## What runs with nothing installed
@@ -121,9 +121,9 @@ npm run gate
 gate: 18/18 ok, 55s total
 ```
 
-18 documents · **33,736 lines · 2,436,238 glyphs · 40 □**. The 11 `nimbus791`
+18 documents · **33,736 lines · 2,436,253 glyphs · 32 □**. The 11 `nimbus791`
 documents also carry truth transcripts and match **5,028 of 5,028 rows, spacing
-included**. All 40 □ have been looked at rather than assumed away — **24 are
+included**. All 32 □ have been looked at rather than assumed away — **16 are
 ordinary black text**, i.e. a face missing from a pool, which is a hunt and a
 winnable one; the rest is colour and graphics the reader is right to refuse.
 Census, and what the reference has already caught:

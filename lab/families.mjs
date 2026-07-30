@@ -225,6 +225,15 @@ export const FAMILIES = [
   // The same pages also embed a REAL Times New Roman subset for ■ and curly
   // quotes, rendered at the same pens. METHOD rule 6 again.
   { name: 'tnrlin1024', renderable: true, font: 'times.ttf', em64: 1024, fy: [0], gid: 'cmap', law: 'fzLin254', set: 'tnrlin1024' },
+  // The REAL TNR Bold companion (METHOD rule 6 a third time on these pages).
+  // Proven 2026-07-30: P5 heading tail `("DRY CELL" STATUS)` — 6/7 clean
+  // components byte-exact at em64 1024 under fzLin254 + the page-5 palette
+  // quantMap (R Y ” S T A; scan 950..1100 hits ONLY 1024; NimbusRoman-Bold
+  // decoy 0/6, and its own control E hits only NimbusRoman-Bold@1024). NOTE:
+  // identify's exact test has no palette step, so this family scores thin here
+  // — the reader with --palette is what confirms it.
+  { name: 'tnrbdlin1024', renderable: true, font: 'timesbd.ttf', em64: 1024, fy: [0], gid: 'cmap', law: 'fzLin254',
+    set: 'tnrbdlin1024', record: 'gate nimbusrom.pdf P5 y745 heading tail — palette-aware 6/7 exact @1024, decoys flat 0' },
   // Sub-family of the same palette container (ECF court filings): NO linear
   // step. One sub-family per SOURCE-document producer.
   { name: 'censcbk1198', renderable: true, font: 'CENSCBK.TTF', em64: 1198, fy: [0], gid: 'cmap', law: 'fz',

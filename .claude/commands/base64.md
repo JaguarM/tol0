@@ -63,12 +63,28 @@ brief's; the rest were bought closing it out.
   recovers `NimbusMonoPS-Regular @ 791` on 11/11 characters with every decoy
   face at flat zero.
 
-## The open goal: `dejavuserif786/EFTA01150379`
+## CLOSED 2026-07-29: `dejavuserif786/EFTA01150379` is the 11th pool
 
-2,427 pages of pure base64, the biggest payload in the corpus. The face is
-*right* (DejaVu Serif @ em64 786); only the build is wrong, so 9/391 targets
-are exact and 0 bytes decode. DejaVu 2.34 ≡ 2.35 is eliminated. This is now the
-primary, because it is the one still capable of becoming a pool.
+The "wrong build" was never a different font. It is stock DejaVu Serif 2.34 run
+through the producer's TRANSPORT law — a quad→cubic→quad round trip on the 2048
+grid plus a stale hmtx — recreated, independently verified (rounding-off
+identity control, empty near band, `backlaw.py` concordance 65/65), and shipped
+as `lab/transform.mjs` + pool `dejavuserif786law` at tolerance 0. Whole
+document: 12,901,175 glyphs, 61 □. The `bclc.gif` payload decodes with its
+block chain closing on the exact final byte. Full record: `lab/families.mjs`
+`dejavuserif786`; residual dispositions in `tools/glyph-registry.mjs` POOLS.
+
+**CORRECTED 2026-07-30, and it changes what "remains" means:** the tol-0 read
+also carries **259 SILENT L→I substitutions** — no □, no fail — via the
+engine's acceptance rule (a subset glyph outscores its superset when the
+superset's extra ink goes pending at a junction). ~~"read gaps, not
+misreads"~~ is superseded; the family/law is untouched (the defect is the
+reader's scorer, not the transport law), and the `bclc.gif` validation stands
+(its pages 3–4 contain none of the 259). The fix is a prepared work order:
+**`/subset-fix`** — engine scorer + a reconstruct-pdf.mjs line-placement bug,
+with reproducers and pre-fix baselines staged in `lab/base64/`
+(`gap-census.mjs`, `verify-silent.mjs`, `audit-reconstruction.mjs`).
+Provenance still waits on era-SDK bytes matching `75707371a24d48cf`.
 
 ## Non-negotiable
 

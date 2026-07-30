@@ -15,7 +15,7 @@ fact you need:
 | [docs/LAWS.md](docs/LAWS.md) | measured physics — pen lattice, blend, producer post-laws, colour |
 | [docs/METHOD.md](docs/METHOD.md) | how this kind of problem is worked: eight rules |
 | [docs/FONTS.md](docs/FONTS.md) | what ships, what you regenerate, and why |
-| [fixtures/gate-ref/README.md](fixtures/gate-ref/README.md) | the gate's expected numbers, and all 40 □ one by one |
+| [fixtures/gate-ref/README.md](fixtures/gate-ref/README.md) | the gate's expected numbers, and all 32 □ one by one |
 | [lab/README.md](lab/README.md) | the hunt half — finding a producer nobody has identified |
 | [lab/rust/README.md](lab/rust/README.md) | the lab's fast engine and its certification chain |
 
@@ -51,8 +51,8 @@ npm run gate:synth        # SYNTHETIC GATE CERTIFIED, 19 assertions, ~1.2 s
 npm run rust:certify      # 13 assertions, ~2.4 s   (after: npm run rust:build)
 
 npm run glyph-sets:verify # 13 shipped sets reproduce byte-identically
-npm run glyphs-check      # glyphs.bin ⇔ 75 npz sets
-npm run gate              # 18/18 BYTE-IDENTICAL, 2,436,238 glyphs, 40 □, ~55 s
+npm run glyphs-check      # glyphs.bin ⇔ 77 npz sets
+npm run gate              # 18/18 BYTE-IDENTICAL, 2,436,253 glyphs, 32 □, ~55 s
 npm run lab:selftest      # a whole hunt on a known answer, 11 assertions, ~60 s
 npm run sync:recto:check  # "Recto is in sync", exit 0
 ```
