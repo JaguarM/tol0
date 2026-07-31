@@ -197,6 +197,53 @@ What *is* proven is the consequence: **hand-cut templates cannot read this
 document**, and the way in is to identify the face and generate rasters at the
 measured offsets ([lab/README.md](../lab/README.md)), not to cut more.
 
+## `resample-fit.mjs` — fitting the producer instead of labelling around it
+
+For the `816×1073` family the answer is not templates and not a face hunt: the
+page was resampled after rendering, so the only route is a forward model —
+rasterize at the source resolution, apply the producer's resample, compare.
+
+The trick is what you compare against. Fitting one isolated glyph leaves a
+shallow valley: em64 and blur width trade against each other and 110 bytes
+cannot separate them. But **every line of these documents starts with `>`**, so
+a page carries ~60 instances of a known character in a known column. They share
+an x sub-pixel phase (same column) and differ in y (the row pitch is
+incommensurate with the resample period), so one configuration has to explain
+sixty different y phases with a single pen origin.
+
+```bash
+node monospace-lab/resample-fit.mjs --em 2560,2660,4 --sigma 0.32,0.40,0.48
+node monospace-lab/resample-fit.mjs --doc <other.pdf> --em 3100,3300,4   # a 12 pt source
+```
+
+Two stages, deliberately separate. **FIT** lets each pen float, so a wrong
+(em64, kernel) cannot hide behind one lucky alignment. **PHYSICS** then checks
+that the fitted pens lie on one line — a config that scores well only by
+scattering its pens has not found the producer.
+
+Measured on `courir-strech/EFTA02154109` p2, 2026-07-31:
+
+```
+BEST em64 2604  σx 0.40  σy 0.40          = 40.69 source px = 9.77 pt at 300 dpi
+PHYSICS  pen x sd 0.000 source px         (all markers share a column ✓)
+         pen y pitch 14.3359 output px    vs 14.3260 measured independently ✓
+         residual sd 0.290 source px
+VERIFY   40 markers, pens PREDICTED from that line: 2.67 per byte
+```
+
+The physics check passing is the substantive result: **one pen origin and one
+pitch place every marker**, and the fitted row pitch matches the page's own to
+0.01 px without being told it. The recipe is therefore right in its geometry
+and still wrong in its greys — `2.67 per byte over 4,000 bytes` is the number a
+correct recipe drives to 0, and it is the honest objective. The old
+single-glyph score is not; it was small because it was easy.
+
+**em64 lands on 2600, not 3200.** 2600 = 832 × 25/8 exactly — i.e. the source
+is `cour13` (the readable courier family's own size, 13 px at 96 dpi) rendered
+at 300 dpi. If other documents in the corpus are Courier **12 pt**, that is
+em64 3200 at 300 dpi and a different sub-family; point this tool at them with
+`--em 3100,3300,4` and let the physics check say so.
+
 ## Files
 
 | | |
@@ -209,6 +256,7 @@ measured offsets ([lab/README.md](../lab/README.md)), not to cut more.
 | `src/templates.mjs` | what a template is and how it is named |
 | `index.html` `app.js` `style.css` | the human's half |
 | `payoff.mjs` | is this document worth labelling by hand — run it first |
+| `resample-fit.mjs` | fit the producer's downscale against every known glyph on a page |
 | `selftest.mjs` | the gate — measurement, matching, and the crop rule, headless |
 | `uitest.mjs` | the same loop driven through headless Chrome |
 | `templates/<pool>/` | saved templates, one JSON per cut, raw gray bytes |

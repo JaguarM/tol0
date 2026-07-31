@@ -62,6 +62,24 @@ Two properties the reader depends on:
 - **It is monotone in `dst`.** A pixel that stays under the dark threshold for
   every possible canvas state can be settled without knowing what comes next.
 
+…and one it can be *tested* with:
+
+- **The law is not onto. Over white paper it emits 255 of the 256 bytes, and
+  the one it cannot emit is 127** — `cov = 127` gives 128, `cov = 128` gives
+  126, and nothing in between. So **byte 127 in glyph ink is proof that a page
+  is not one pass of this law over paper.** Composites can reach it, so it only
+  counts in bulk; in a monospace wall glyphs do not overlap and it counts
+  immediately.
+
+  This is the cheapest producer test in the repo — one byte, no roster, no
+  render, no font. Measured over the 40 documents of `lab/base64/` on
+  2026-07-31: every **816×1056** page (36 documents, 7 families) carries
+  **0.000 %**, and every **816×1073** page (14 documents) carries
+  **0.19–0.50 %** — against the ~1/255 = 0.39 % you would expect if *every* ink
+  pixel were an average of two rendered values. The rate is not a hint, it is
+  the post-processing itself, measured. (`jitter1-times1024` sits at 0.018 %,
+  which is the registered `jpeg-jitter` law and not this one.)
+
 ## 3. The law, read backwards
 
 Reading is that law inverted, one glyph at a time, left to right:
@@ -100,6 +118,27 @@ darker. The available set is read off the page itself — every actual page byte
 is in it by construction, so palette grays are fixpoints. Scan canvases stay in
 original space, because the producer quantized *once, at the end*, and every
 prediction-vs-page compare goes through the map.
+
+**Page resample — the one post-law that is NOT modelled, and the reason 14
+documents do not read at all.** The `816×1073` family (`lab/families.mjs`
+`page-downscale-816x1073`) is a page RESAMPLED after rendering. Byte 127 is
+present at 0.19–0.50 % of ink, so this is settled fact, not a theory. What is
+measured about the geometry:
+
+- A letter page at 300 dpi is 2550 × 3300, and **8/25 of that is exactly
+  816 × 1056** — the size of every native document in the corpus. This family
+  is 816 × 1073, i.e. the same downscale with **y stretched by
+  1073/1056 = 1.0161**.
+- So **x scale = 8/25 exactly** (period 8 output px — sub-pixel phase repeats,
+  which is why a template cut on one row matches the same row on every page)
+  and **y scale = 1073/3300** (1073 and 3300 are coprime — the phase never
+  repeats, which is why no two text rows ever share a rasterization).
+
+That asymmetry is the entire behaviour of the family, and it is why it is not a
+face hunt: there is no (face, em64, pen, law) that reproduces the page, because
+the page is not a per-pixel function of any 1× coverage map. **The reader must
+refuse these documents rather than read them at a widened tolerance**
+([METHOD](METHOD.md) rule 5); there is deliberately no pool.
 
 ## 5. Colour, and why the raster mode is not a detail
 
