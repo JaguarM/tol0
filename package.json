@@ -20,6 +20,10 @@
     "sync:recto:check": "node tools/sync-recto.mjs --check",
     "recto-test": "node tools/test-recto-app.mjs",
     "lab:selftest": "node lab/selftest.mjs",
+    "mono": "node monospace-lab/server.mjs",
+    "mono:payoff": "node monospace-lab/payoff.mjs",
+    "mono:selftest": "node monospace-lab/selftest.mjs",
+    "mono:uitest": "node monospace-lab/uitest.mjs",
     "rust:build": "cargo build --release --manifest-path lab/rust/Cargo.toml",
     "rust:certify": "node lab/rust/certify.mjs"
   },

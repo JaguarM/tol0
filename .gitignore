@@ -80,3 +80,6 @@ lab/.fontcache/
 # app-bundled font files, so they carry their own licences and are never ours
 # to commit. Rebuild by re-running the inventory, not by restoring this.
 lab/.fontstage/
+
+# --- templates
+monospace-lab/templates/*

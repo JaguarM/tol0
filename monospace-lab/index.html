@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>monospace lab</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header id="bar">
+  <select id="doc" title="document"></select>
+  <span class="grp">
+    <button id="prev" title="previous page">◀</button>
+    <span id="pageno">–</span>
+    <button id="next" title="next page">▶</button>
+  </span>
+  <span class="grp" id="pool-wrap">pool <input id="pool" size="10" title="template pool — templates are only offered to documents of the same pool"></span>
+  <button id="measure" title="re-fit both lattices from this page's pixels">measure grid</button>
+  <button id="read" title="read every cell">read</button>
+  <button id="next-unread" title="jump to the next unread cell (n)">next □</button>
+  <button id="export">export</button>
+  <span class="grp toggles">
+    <label><input type="checkbox" id="t-grid" checked> grid</label>
+    <label><input type="checkbox" id="t-rows" checked> rows</label>
+    <label><input type="checkbox" id="t-reads" checked> reads</label>
+    <label><input type="checkbox" id="t-mask"> mask</label>
+    <label><input type="checkbox" id="t-auto" checked title="after saving a template, re-read and jump to the next □">auto-advance</label>
+  </span>
+  <span id="status"></span>
+</header>
+
+<div id="grid-bar">
+  <label>pitch <input id="g-pitch" type="number" step="0.001" size="8"></label>
+  <label>origin <input id="g-origin" type="number" step="0.001" size="8"></label>
+  <label>lead <input id="g-lead" type="number" step="1" size="3" title="cell rect start, relative to the fitted ink lattice"></label>
+  <label>tmpl w <input id="g-tw" type="number" step="1" size="3" title="template width — one pixel in from each side of the cell"></label>
+  <label>row pitch <input id="g-ypitch" type="number" step="0.001" size="8"></label>
+  <label>row top <input id="g-ytop" type="number" step="1" size="4"></label>
+  <label>row h <input id="g-yh" type="number" step="1" size="3"></label>
+  <span id="fitinfo"></span>
+</div>
+
+<main>
+  <div id="canvas-wrap"><canvas id="canvas"></canvas></div>
+  <aside id="side">
+    <div class="tabs">
+      <button class="tab active" data-tab="transcript">transcript</button>
+      <button class="tab" data-tab="coverage">coverage</button>
+      <button class="tab" data-tab="certificate">certificate</button>
+    </div>
+    <div class="pane active" id="pane-transcript"><pre id="transcript"></pre></div>
+    <div class="pane" id="pane-coverage"><div id="coverage"></div></div>
+    <div class="pane" id="pane-certificate"><div id="certificate"></div></div>
+  </aside>
+</main>
+
+<div id="modal" class="hidden">
+  <div id="modal-box">
+    <div id="modal-head"></div>
+    <div id="modal-cols">
+      <div>
+        <canvas id="preview"></canvas>
+        <div class="hint">the dim border is <b>not</b> in the template — one pixel of gutter each side, so the letters next door cannot bleed in</div>
+      </div>
+      <div id="modal-right">
+        <div id="modal-exact"></div>
+        <div id="modal-ncc"></div>
+        <label>character <input id="label-input" size="4" autocomplete="off"></label>
+        <div class="hint">
+          <b>Enter</b> cut &amp; save &nbsp; <b>Esc</b> cancel &nbsp;
+          <b>← → ↑ ↓</b> nudge the crop &nbsp; <b>[ ]</b> narrow / widen &nbsp;
+          <b>Del</b> delete the template that matched
+        </div>
+        <div id="modal-rect" class="hint"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/engine/ocr-engine.js"></script>
+<script type="module" src="app.js"></script>
+</body>
+</html>
