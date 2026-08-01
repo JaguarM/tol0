@@ -4,16 +4,20 @@ The reader can only certify a document whose **(face, size, pen lattice, blend
 law)** it already knows. This half of the repo finds that tuple, from pixels
 alone, and hands it back as an entry in [families.mjs](families.mjs).
 
-Eight files, and every one of them is on the critical path of a hunt. The
-previous repo had thirty-one tools here; the twenty-three that are gone were
-either one-off probes for hunts that are closed, or second implementations of
-something already listed below. What was learned from them is in
-[../docs/LAWS.md](../docs/LAWS.md) and [../docs/METHOD.md](../docs/METHOD.md),
-which is where a fact belongs once it has stopped being code.
+Ten files, and every one of them is on the critical path of a hunt. Eight
+survived from the previous repo's thirty-one — the twenty-three that are gone
+were either one-off probes for hunts that are closed, or second implementations
+of something already listed below. The two that are new each earned the seat:
+`transform.mjs` is a producer law's reproducer, `resample.mjs` the triage that
+stops a resampled page from burning a sweep. What was learned from the
+twenty-three is in [../docs/LAWS.md](../docs/LAWS.md) and
+[../docs/METHOD.md](../docs/METHOD.md), which is where a fact belongs once it
+has stopped being code.
 
 ## A hunt, in the order you should actually try things
 
 ```bash
+node lab/resample.mjs mystery.pdf            # 0. ~40 s — a 1× render at all? routes the hunt
 node lab/mbank.mjs scan mystery.pdf          # 1. ~100 ms — face and size, cold
 node lab/ingest.mjs mystery.pdf              # 2. the producer's own page rasters
 node lab/harvest.mjs --doc mystery --out h1  #    ground-truth glyph windows
@@ -25,7 +29,10 @@ node lab/sweep.mjs --targets h1 --fonts all              # 5. the exhaustive net
 **Stop as soon as something answers.** Step 1 alone has closed hunts — the
 Tahoma family, the largest tol-0 population in the corpus, was found by the m
 bank and proven the same day. Steps 2–5 cost progressively more, and step 5
-costs hours.
+costs hours. Step 0 exists because the answer can be "no face will ever
+match": a resampled page (the 816×1073 family) fails every sweep by
+construction, and the triage says which way the pixels went — per axis, with
+its own positive controls — before those hours are spent.
 
 Two of those steps have a fast twin in **[rust/](rust/)**, which is the same
 search certified against this JavaScript: `hunt sweep` is step 5 at 40–45×, and
@@ -38,16 +45,18 @@ build the glyph set with `tools/fontgen.mjs`, add a pool to
 `tools/glyph-registry.mjs`, and let `npm run gate` hold it still. **The lab
 does not read documents; the reader does.**
 
-## The eight, and the engine
+## The ten, and the engine
 
 | | |
 |---|---|
+| [resample.mjs](resample.mjs) | upscaled, downscaled, or native — per axis, self-checked; run before a sweep |
 | [mbank.mjs](mbank.mjs) | 4 px of one `m` names a face — the prefilter that starts a hunt |
 | [ingest.mjs](ingest.mjs) | PDF → the producer's own page raster + its OCR overlay |
 | [harvest.mjs](harvest.mjs) | pages → byte-identical glyph windows you can call ground truth |
 | [identify.mjs](identify.mjs) | targets → every proven family, then an em64 scan of one face |
 | [sweep.mjs](sweep.mjs) | targets → every (face, em64, pen, law), when nothing known fits |
 | [families.mjs](families.mjs) | the answers so far, as data — and the blend laws (six names, four distinct maps) |
+| [transform.mjs](transform.mjs) | the dejavuserif786 producer's transport law, recreated — the reproducer its families.mjs entry cites |
 | [pgm.mjs](pgm.mjs) | the pixel container, and one definition of ink |
 | [selftest.mjs](selftest.mjs) | `npm run lab:selftest` — the whole loop, on a known answer |
 | [rust/](rust/) | optional: the sweep at 40–45×, the anisotropic probe, the component harvester — with its own gate |
