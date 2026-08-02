@@ -173,7 +173,8 @@ for (const i of used) {
     for (let x = 0; x < TW; x++)
       i.target[y * TW + x] = page.gray[(i.TY0 + y) * page.w + i.TX0 + x];
 }
-const inkBytes = used.reduce((s, i) => s + i.target.reduce((a, v) => a + (v < 255 ? 1 : 0), 0), 0);
+let inkBytes = used.reduce((s, i) => s + i.target.reduce((a, v) => a + (v < 255 ? 1 : 0), 0), 0);
+const countInk = () => used.reduce((s, i) => s + i.target.reduce((a, v) => a + (v < 255 ? 1 : 0), 0), 0);
 console.log(`  window ${TW}×${TH} = ${TW * TH} bytes per marker, ${used.length} markers, ` +
   `${inkBytes} ink bytes total`);
 { // paper must be exactly 255 with zero variance, or the window has a neighbour in it
@@ -557,7 +558,7 @@ for (const fineStep of PENS) for (const em of EMS) for (const aspect of ASPECTS)
 console.log(`\n[${((Date.now() - t0) / 1000).toFixed(0)}s]`);
 
 // ---- the verdict -------------------------------------------------------------
-const b = overall;
+let b = overall;
 console.log(`BEST  em64 ${b.em}${b.aspect === 1 ? '' : ` (x) / ${b.emy} (y), aspect ${b.aspect}`}  ` +
   `fy ${b.fy}  ${KX} / ${KY}  pen 1/${64 / b.penStep} px`);
 console.log(`  Σ|Δ| ${b.tot} over ${b.n} glyphs = ${b.perGlyph.toFixed(1)} per glyph, ` +
@@ -579,6 +580,86 @@ if (NULL) {
   process.exit(ok ? 0 : 1);
 }
 
+// ---- SYNTHETIC TARGETS: the positive control the structural solves need -------
+// The null certifies the forward path at SCALE 1, where the resample is the
+// identity — so it says nothing about the two structural solves, which live
+// entirely inside the resample. Each rests on an approximation the null cannot
+// reach: the kernel taps are binned every ¼ source px against phases that are
+// continuous, and 57 markers are folded onto ONE raster. Either could floor a
+// solve well above zero on data that a downscale explains perfectly, and a
+// negative result from an uncalibrated solve is not a refutation — it is an
+// unread instrument.
+//
+// So replace every target with the forward model's OWN output at a known
+// configuration, and re-run. The answer is then known and each solve must find
+// it. --synth-kx / --synth-ky generate through a kernel the solve is not told
+// about (leave them off and the fit should score ~0 by construction, which is
+// the cheapest check that generation itself is sound). --synth-jitter scatters
+// the pen off the line by a given sd in source px: that is the ONE departure
+// from the shared-raster premise the real page is known to carry, at 0.27 src
+// px measured by stage B, and it is how you find out what the free-source
+// floor of ~3.85 bytes is actually made of.
+function forward(i, WX, WY) {
+  const out = new Uint8Array(TW * TH);
+  for (let y = 0; y < SH; y++) {
+    const row = y * SW;
+    for (let x = 0; x < TW; x++) {
+      const { idx, wt } = WX[x];
+      let a = 0;
+      for (let j = 0; j < idx.length; j++) a += src[row + idx[j]] * wt[j];
+      tmp[y * TW + x] = a;
+    }
+  }
+  for (let y = 0; y < TH; y++) {
+    const { idx, wt } = WY[y];
+    for (let x = 0; x < TW; x++) {
+      let a = 0;
+      for (let j = 0; j < idx.length; j++) a += tmp[idx[j] * TW + x] * wt[j];
+      const v = roundBy(a);
+      out[y * TW + x] = v < 0 ? 0 : v > 255 ? 255 : v;
+    }
+  }
+  return out;
+}
+let SYNTH = null;
+if (flag('synth')) {
+  const skx = parseK(opt('synth-kx', KX)), sky = parseK(opt('synth-ky', KY));
+  const sem = +opt('synth-em', String(b.em));
+  const jit = +opt('synth-jitter', '0');
+  const P42 = +opt('pitch', '42');
+  EMY = Math.round(sem * b.aspect * 32) / 32;
+  geometry(b.fy);
+  if (src.length !== SW * SH) { src = new Uint8Array(SW * SH); clone.W = SW * SUPER; clone.H = SH * SUPER; }
+  if (tmp.length !== TW * SH) tmp = new Float64Array(TW * SH);
+  clone.cache.clear();
+  // The pen goes on an EXACT line with an EXACT integer pitch, so the markers
+  // share one source raster by construction — that is the premise under test,
+  // and --synth-jitter is how you break it by a known amount.
+  let seed = 20260803 >>> 0;
+  const rnd = () => { seed = (seed * 1103515245 + 12345) >>> 0; return seed / 4294967296; };
+  for (const i of used) {
+    const WXs = axisW(i.TX0, TW, FX, i.SX0, SW, skx);
+    const WYs = axisW(i.TY0, TH, b.fy, i.SY0, SH, sky);
+    const dj = jit ? Math.round((rnd() * 2 - 1) * Math.sqrt(3) * jit * 64) : 0;  // uniform, sd = jit
+    const px64 = Math.round((b.line.X0 - i.SX0) * 64);
+    const py64 = Math.round((b.line.Y0 + P42 * i.k - i.SY0) * 64) + dj;
+    if (!render(sem, px64, py64)) { console.error('synth: no raster'); process.exit(2); }
+    i.target = forward(i, WXs, WYs);
+  }
+  inkBytes = countInk();
+  SYNTH = { skx: opt('synth-kx', KX), sky: opt('synth-ky', KY), sem, jit };
+  console.log(`\n*** SYNTHETIC TARGETS — THIS IS A CONTROL, NOT A MEASUREMENT OF THE PAGE ***`);
+  console.log(`  generated: em64 ${sem}, fy ${b.fy}, x ${SYNTH.skx} / y ${SYNTH.sky}, ` +
+    `pen on an exact line, pitch ${P42} src px, jitter sd ${jit} src px`);
+  console.log(`  the solves below are told x ${KX} / y ${KY} and must recover the rest.`);
+  // Re-fit on the synthetic page: everything downstream reads b.line, so the
+  // control must go through the same three stages the real data does.
+  const r = runConfig(b.em, b.fy, kx, ky, b.penStep, b.aspect, false);
+  b = r;
+  console.log(`  re-fit on the control: ${r.perGlyph.toFixed(1)} per glyph, ${r.nExact}/${r.n} byte-exact, ` +
+    `pen line ${r.line.X0.toFixed(3)}, ${r.line.Y0.toFixed(3)}, ${r.line.P.toFixed(4)}`);
+}
+
 // ---- IS IT THE RESAMPLE AT ALL? ----------------------------------------------
 // Every kernel tried so far is a two-parameter guess (box or tent, one width).
 // This bounds the WHOLE family at once: let the vertical kernel be an arbitrary
@@ -594,8 +675,26 @@ if (NULL) {
 //                         every remaining kernel hypothesis is dead.
 if (flag('solve-y') || flag('solve-x')) {
   const AX = flag('solve-x') ? 'x' : 'y';
-  const NB = 41, BW = 0.25, B0 = -(NB - 1) / 2 * BW;   // taps every ¼ src px over ±5
+  // TAP NODES, and how a source pixel is assigned to them. The kernel is a
+  // continuous function of the offset between a source pixel and the output
+  // pixel's centre; the solve can only carry it at a finite set of nodes. The
+  // first version of this solve assigned each source pixel to its NEAREST node,
+  // which quantises that offset by up to half a node spacing — a phase-dependent
+  // error that no choice of taps can absorb, and it floors the solve well above
+  // zero on data a tent explains exactly (53.7 per glyph in y, 23.2 in x,
+  // measured with --synth). LINEAR INTERPOLATION between the two straddling
+  // nodes removes it to second order and is what makes the free-kernel verdict
+  // readable. Keep --tap-nearest only to reproduce the old numbers.
+  const BW = +opt('tapw', '0.25');
+  const NB = 2 * Math.round(5 / BW) + 1, B0 = -(NB - 1) / 2 * BW;
+  const NEAREST = flag('tap-nearest');
   const lam = +opt('lambda', '30');
+  const spread = (row, u, v) => {
+    if (NEAREST) { const bi = Math.round(u); if (bi >= 0 && bi < NB) row[bi] += v; return; }
+    const b0 = Math.floor(u), f = u - b0;
+    if (b0 >= 0 && b0 < NB) row[b0] += v * (1 - f);
+    if (b0 + 1 >= 0 && b0 + 1 < NB) row[b0 + 1] += v * f;
+  };
   EMY = b.emy;
   geometry(b.fy);
   clone.cache.clear();
@@ -633,10 +732,7 @@ if (flag('solve-y') || flag('solve-x')) {
         const c = (i.TY0 + Y + 0.5) * b.fy - i.SY0;
         for (let X = 0; X < TW; X++) {
           const row = new Float64Array(NB);
-          for (let s = 0; s < SH; s++) {
-            const bi = Math.round((s + 0.5 - c - B0) / BW);
-            if (bi >= 0 && bi < NB) row[bi] += mid[s * TW + X];
-          }
+          for (let s = 0; s < SH; s++) spread(row, (s + 0.5 - c - B0) / BW, mid[s * TW + X]);
           A.push(row); rhs.push(i.target[Y * TW + X]);
         }
       }
@@ -654,10 +750,7 @@ if (flag('solve-y') || flag('solve-x')) {
         for (let X = 0; X < TW; X++) {
           const c = (i.TX0 + X + 0.5) * FX - i.SX0;
           const row = new Float64Array(NB);
-          for (let s = 0; s < SW; s++) {
-            const bi = Math.round((s + 0.5 - c - B0) / BW);
-            if (bi >= 0 && bi < NB) row[bi] += mid[Y * SW + s];
-          }
+          for (let s = 0; s < SW; s++) spread(row, (s + 0.5 - c - B0) / BW, mid[Y * SW + s]);
           A.push(row); rhs.push(i.target[Y * TW + X]);
         }
       }
@@ -696,25 +789,61 @@ if (flag('solve-y') || flag('solve-x')) {
     h[r] = s / (M[r][r] || 1e-12);
   }
   // evaluate WITH rounding, exactly as the producer would
-  let tot = 0, nExact = 0;
-  for (let r = 0, m = 0; m < used.length; m++) {
-    let bad = false;
-    for (let p = 0; p < TW * TH; p++, r++) {
-      let a = 0;
-      for (let q = 0; q < N; q++) a += A[r][q] * h[q];
-      let v = roundBy(a); v = v < 0 ? 0 : v > 255 ? 255 : v;
-      const d = Math.abs(v - rhs[r]);
-      tot += d; if (d) bad = true;
+  const evalTaps = t => {
+    let tot = 0, nExact = 0;
+    for (let r = 0, m = 0; m < used.length; m++) {
+      let bad = false;
+      for (let p = 0; p < TW * TH; p++, r++) {
+        let a = 0;
+        for (let q = 0; q < N; q++) a += A[r][q] * t[q];
+        let v = roundBy(a); v = v < 0 ? 0 : v > 255 ? 255 : v;
+        const d = Math.abs(v - rhs[r]);
+        tot += d; if (d) bad = true;
+      }
+      if (!bad) nExact++;
     }
-    if (!bad) nExact++;
+    return { tot, nExact };
+  };
+  // LIKE FOR LIKE, and the lack of it is what produced the claim that a free
+  // kernel "cannot even beat the two-parameter tent". The tent's 186.8 is
+  // scored through axisW's exact continuous weights; the free kernel is scored
+  // through tap nodes. Those are different objectives. Score the ANALYTIC
+  // kernel through this very design matrix so the two numbers mean the same
+  // thing, and read the free kernel against THAT.
+  const kRef = AX === 'y' ? ky : kx;
+  const hRef = new Float64Array(NB);
+  for (let q = 0; q < NB; q++) {
+    const t = B0 + q * BW;
+    hRef[q] = kRef.type === 'tri' ? Math.max(0, 1 - Math.abs(t) / kRef.w) / kRef.w
+      : (Math.abs(t) < kRef.w / 2 ? 1 / kRef.w : 0);
   }
+  // axisW normalises its weights to sum to 1 for EACH output pixel; the tap
+  // model cannot, because one tap vector serves every phase. That is a pure
+  // gain difference, so give the analytic kernel its best single scale factor
+  // before comparing — otherwise the reference is penalised for something the
+  // free kernel is not being asked to reproduce.
+  {
+    let num = 0, den = 0;
+    for (let r = 0; r < A.length; r++) {
+      let a = 0;
+      for (let q = 0; q < N; q++) a += A[r][q] * hRef[q];
+      num += a * rhs[r]; den += a * a;
+    }
+    const alpha = den ? num / den : 1;
+    for (let q = 0; q < N; q++) hRef[q] *= alpha;
+  }
+  const ref = evalTaps(hRef);
+  const { tot, nExact } = evalTaps(h);
   const sumH = h.reduce((s, v) => s + v, 0);
   let m1 = 0, m2 = 0;
   for (let q = 0; q < N; q++) { const t = B0 + q * BW; m1 += h[q] * t; m2 += h[q] * t * t; }
   console.log(`\nFREE ${AX === 'y' ? 'VERTICAL' : 'HORIZONTAL'} KERNEL (${NB} taps every ${BW} src px, ` +
-    `smoothing λ ${lam}), ${AX === 'y' ? `x held at ${KX}` : `y held at ${KY}`}, fy ${b.fy}:`);
+    `${NEAREST ? 'NEAREST-node' : 'linear-interpolated'}, smoothing λ ${lam}), ` +
+    `${AX === 'y' ? `x held at ${KX}` : `y held at ${KY}`}, fy ${b.fy}:`);
   console.log(`  Σ|Δ| ${tot} = ${(tot / used.length).toFixed(1)} per glyph, ` +
     `${(tot / inkBytes).toFixed(2)} per ink byte;  ${nExact} of ${used.length} byte-exact`);
+  console.log(`  the SAME design matrix scored with the analytic ${AX === 'y' ? KY : KX}: ` +
+    `${(ref.tot / used.length).toFixed(1)} per glyph, ${ref.nExact} byte-exact  <- the like-for-like comparison`);
   // Source rows are 1 px apart but the taps are binned every BW, so any one
   // output pixel uses only every (1/BW)th tap: the normalisation is 1/BW, not 1.
   console.log(`  kernel: Σtaps ${sumH.toFixed(4)} (must be ~${(1 / BW).toFixed(0)}), centroid ${(m1 / sumH).toFixed(3)}, ` +
@@ -725,9 +854,11 @@ if (flag('solve-y') || flag('solve-x')) {
   console.log(sh);
   console.log(`  VERDICT: ${tot / used.length < 40
     ? 'the kernel WAS the missing term — read it off above.'
-    : `NO ${AX === 'y' ? 'vertical' : 'horizontal'} resample explains this page. An arbitrary ` +
-      'kernel, fitted with every advantage, still cannot reach it — so the missing term is ' +
-      'UPSTREAM of the downscale, in the source render. Kernel hypotheses on this axis are dead.'}`);
+    : `no ${AX === 'y' ? 'vertical' : 'horizontal'} kernel ALONE explains this page: an arbitrary ` +
+      'one, fitted with every advantage, still cannot reach it, and against the analytic ' +
+      'reference above it buys little or nothing. Read that against --synth, whose floor here ' +
+      'is 6.0 per glyph in y and 1.2 in x — NOT against zero. It does not follow that the ' +
+      'downscale is refuted: with the SOURCE freed too (--solve-joint) the tents come back.'}`);
 }
 
 // ---- IS IT A DOWNSCALE OF ANY SOURCE IMAGE AT ALL? ---------------------------
@@ -847,12 +978,12 @@ if (flag('solve-src')) {
     `${(tot / inkBytes).toFixed(2)} per ink byte;  ${nExact} of ${used.length} byte-exact`);
   console.log(`  (the rounded score above is inflated by CG ringing and is NOT the verdict —` +
     ` read the RMS line, which is what the solve minimises.)`);
-  console.log('  CAUTION, and it is why this solve is not a refutation on its own: the floor comes' +
-    '\n  out ~3.85 at EVERY geometry, while cour.ttf\'s own residual swings 4.5-6.1. A detector' +
-    '\n  that returns one number for every hypothesis is measuring its own PREMISE — that all 57' +
-    '\n  markers share one source raster. The pen line scatters 0.27 src px, which against a' +
-    '\n  ~100 byte/px edge and a 9:1 average predicts ~3 bytes. Test the premise with --phase' +
-    '\n  before reading anything structural into this number.');
+  console.log('  THIS FLOOR IS NOT STRUCTURAL, and that is now measured rather than argued: on a' +
+    '\n  --synth control it is 0.133 with a perfect shared raster and 3.904 once a per-line' +
+    '\n  sub-pixel phase scatter of ONE SOURCE PIXEL is injected and nothing else is wrong.' +
+    '\n  The page reads 3.851. So this solve measures its own PREMISE — that all 57 markers' +
+    '\n  share one source raster — which is also why it returns ~3.85 at EVERY geometry while' +
+    '\n  cour.ttf\'s own residual swings 4.5-6.1. Read nothing structural into it.');
   // where the free raster departs from cour.ttf
   let mx = 0, sum = 0, n = 0;
   for (let j = 0; j < NU; j++) { const d = Math.max(0, Math.min(255, S[j])) - S0[j];
@@ -868,6 +999,282 @@ if (flag('solve-src')) {
     }
     console.log(ln);
   }
+}
+
+// ---- FREE SOURCE *AND* FREE KERNEL TOGETHER ----------------------------------
+// The last corner of the downscale hypothesis space. --solve-y/--solve-x free
+// the FILTER with the source held at cour.ttf; --solve-src frees the SOURCE
+// with the filter held at a tent pair. Neither frees both, and a wrong source
+// can always be partly absorbed by a wrong filter — so each of those solves
+// could be reporting the other one's error. This frees both at once.
+//
+// The model is bilinear (out = K applied to S, linear in each separately), so
+// alternating least squares: solve S by conjugate gradient with K held, solve K
+// with S held, repeat. Both steps are exact; ALS descends monotonically.
+// --k2d drops separability too, solving a full 2D kernel over the node grid —
+// at which point the model is the MOST GENERAL LINEAR DOWNSCALE THERE IS: any
+// source image whatsoever, through any fixed 2D filter whatsoever.
+//
+// READ IT AGAINST THE CONTROLS, NEVER AGAINST ZERO. This solve inherits
+// --solve-src's premise (all 57 markers share one raster, folded at an integer
+// source pitch) and therefore its floor, which is set by how well the markers
+// actually agree — 0.133 bytes RMS on a perfect control, 3.64 with a 0.27 src
+// px pen scatter injected. Run --synth alongside every real run.
+if (flag('solve-joint')) {
+  const BW = +opt('tapw', '0.25');
+  const NB = 2 * Math.round(5 / BW) + 1, B0 = -(NB - 1) / 2 * BW, R = 5 - BW;
+  const K2D = flag('k2d');
+  const lam = +opt('lambda', '30');
+  const P42 = +opt('pitch', '42');
+  const ALS = +opt('als', '8'), CGS = +opt('cg', '300'), CGK = +opt('cgk', '200');
+  EMY = b.emy;
+  geometry(b.fy);
+  clone.cache.clear();
+
+  // ---- the term list: one entry per (equation, source pixel) ----------------
+  // Each source pixel lands between two kernel nodes on each axis and is split
+  // between them linearly — the same interpolation that took the free-kernel
+  // solve's floor from 53.7 to 6.0 per glyph.
+  let sLo = 1e9, sHi = -1e9, cLo = 1e9, cHi = -1e9, nTerm = 0;
+  const NEQ = used.length * TH * TW;
+  const eqStart = new Int32Array(NEQ + 1);
+  {
+    let e = 0;
+    for (const i of used) for (let Y = 0; Y < TH; Y++) for (let X = 0; X < TW; X++, e++) {
+      const cy = (i.TY0 + Y + 0.5) * b.fy, cx = (i.TX0 + X + 0.5) * FX;
+      let n = 0;
+      for (let sy = Math.ceil(cy - R - 0.5); sy <= Math.floor(cy + R - 0.5); sy++) {
+        const sRel = sy - P42 * i.k;
+        if (sRel < sLo) sLo = sRel; if (sRel > sHi) sHi = sRel;
+        for (let sx = Math.ceil(cx - R - 0.5); sx <= Math.floor(cx + R - 0.5); sx++) {
+          if (sx < cLo) cLo = sx; if (sx > cHi) cHi = sx;
+          n++;
+        }
+      }
+      eqStart[e + 1] = eqStart[e] + n; nTerm += n;
+    }
+  }
+  const NR = sHi - sLo + 1, NC = cHi - cLo + 1, NU = NR * NC;
+  const sIdx = new Int32Array(nTerm), byi = new Int32Array(nTerm), bxi = new Int32Array(nTerm);
+  const fyf = new Float64Array(nTerm), fxf = new Float64Array(nTerm);
+  const rhs = new Float64Array(NEQ);
+  {
+    let e = 0, t = 0;
+    for (const i of used) for (let Y = 0; Y < TH; Y++) for (let X = 0; X < TW; X++, e++) {
+      const cy = (i.TY0 + Y + 0.5) * b.fy, cx = (i.TX0 + X + 0.5) * FX;
+      rhs[e] = i.target[Y * TW + X];
+      for (let sy = Math.ceil(cy - R - 0.5); sy <= Math.floor(cy + R - 0.5); sy++) {
+        const uy = (sy + 0.5 - cy - B0) / BW, y0 = Math.floor(uy);
+        const sRel = sy - P42 * i.k - sLo;
+        for (let sx = Math.ceil(cx - R - 0.5); sx <= Math.floor(cx + R - 0.5); sx++, t++) {
+          const ux = (sx + 0.5 - cx - B0) / BW, x0 = Math.floor(ux);
+          sIdx[t] = sRel * NC + (sx - cLo);
+          byi[t] = y0; fyf[t] = uy - y0;
+          bxi[t] = x0; fxf[t] = ux - x0;
+        }
+      }
+    }
+  }
+  const eqOf = new Int32Array(nTerm);
+  for (let e = 0; e < NEQ; e++) for (let t = eqStart[e]; t < eqStart[e + 1]; t++) eqOf[t] = e;
+
+  // ---- the unknowns ---------------------------------------------------------
+  // S starts at what cour.ttf actually renders, so the solve reports a delta;
+  // the kernels start at the tent pair the fit settled on.
+  const S = new Float64Array(NU).fill(255);
+  {
+    const px0 = Math.round((b.line.X0 - used[0].SX0) * 64);
+    const py0 = Math.round((b.line.Y0 + b.line.P * used[0].k - used[0].SY0) * 64);
+    render(b.em, px0, py0);
+    for (let s = 0; s < SH; s++)
+      for (let c = 0; c < SW; c++) {
+        const sr = s + used[0].SY0 - P42 * used[0].k - sLo, cr = c + used[0].SX0 - cLo;
+        if (sr >= 0 && sr < NR && cr >= 0 && cr < NC) S[sr * NC + cr] = src[s * SW + c];
+      }
+  }
+  const S0 = Float64Array.from(S);
+  const tapsOf = K => { const h = new Float64Array(NB);
+    for (let q = 0; q < NB; q++) { const t = B0 + q * BW;
+      h[q] = K.type === 'tri' ? Math.max(0, 1 - Math.abs(t) / K.w) / K.w
+        : (Math.abs(t) < K.w / 2 ? 1 / K.w : 0); }
+    return h; };
+  let hy = tapsOf(ky), hx = tapsOf(kx);
+  let K2 = null;
+  if (K2D) { K2 = new Float64Array(NB * NB);
+    for (let a = 0; a < NB; a++) for (let c = 0; c < NB; c++) K2[a * NB + c] = hy[a] * hx[c]; }
+
+  // per-term weight under the current kernel
+  const wArr = new Float64Array(nTerm);
+  const refreshW = () => {
+    for (let t = 0; t < nTerm; t++) {
+      const a = byi[t], c = bxi[t], u = fyf[t], v = fxf[t];
+      if (K2D) wArr[t] = K2[a * NB + c] * (1 - u) * (1 - v) + K2[(a + 1) * NB + c] * u * (1 - v)
+        + K2[a * NB + c + 1] * (1 - u) * v + K2[(a + 1) * NB + c + 1] * u * v;
+      else wArr[t] = (hy[a] * (1 - u) + hy[a + 1] * u) * (hx[c] * (1 - v) + hx[c + 1] * v);
+    }
+  };
+  const model = () => { const o = new Float64Array(NEQ);
+    for (let t = 0; t < nTerm; t++) o[eqOf[t]] += S[sIdx[t]] * wArr[t]; return o; };
+  const rmsNow = clamp => {
+    const o = new Float64Array(NEQ);
+    for (let t = 0; t < nTerm; t++) {
+      const s = clamp ? Math.max(0, Math.min(255, S[sIdx[t]])) : S[sIdx[t]];
+      o[eqOf[t]] += s * wArr[t];
+    }
+    let q = 0; for (let e = 0; e < NEQ; e++) q += (o[e] - rhs[e]) ** 2;
+    return Math.sqrt(q / NEQ);
+  };
+  const dot = (a, c) => { let s = 0; for (let j = 0; j < a.length; j++) s += a[j] * c[j]; return s; };
+  const cgNormal = (applyN, rhsN, x0, iters) => {
+    const n = x0.length, x = Float64Array.from(x0);
+    const r = new Float64Array(n), Ax = applyN(x);
+    for (let j = 0; j < n; j++) r[j] = rhsN[j] - Ax[j];
+    let p = Float64Array.from(r), rs = dot(r, r);
+    for (let it = 0; it < iters && rs > 1e-14; it++) {
+      const Ap = applyN(p);
+      const pAp = dot(p, Ap);
+      if (pAp <= 0) break;
+      const al = rs / pAp;
+      for (let j = 0; j < n; j++) { x[j] += al * p[j]; r[j] -= al * Ap[j]; }
+      const rs2 = dot(r, r);
+      for (let j = 0; j < n; j++) p[j] = r[j] + (rs2 / rs) * p[j];
+      rs = rs2;
+    }
+    return x;
+  };
+
+  // ---- ALS ------------------------------------------------------------------
+  refreshW();
+  console.log(`\nFREE SOURCE + FREE ${K2D ? 'NON-SEPARABLE 2D' : 'SEPARABLE'} KERNEL ` +
+    `(${NU} source px + ${K2D ? NB * NB : 2 * NB} kernel taps, ${NEQ} equations, ` +
+    `nodes every ${BW} src px, pitch ${P42}, fy ${b.fy}):`);
+  console.log(`  start (cour.ttf through ${KX}/${KY}): RMS ${rmsNow(false).toFixed(3)} bytes`);
+  for (let it = 0; it < ALS; it++) {
+    // --- S step: kernel held ---
+    {
+      const applyN = v => {
+        const o = new Float64Array(NEQ);
+        for (let t = 0; t < nTerm; t++) o[eqOf[t]] += v[sIdx[t]] * wArr[t];
+        const g = new Float64Array(NU);
+        for (let t = 0; t < nTerm; t++) g[sIdx[t]] += o[eqOf[t]] * wArr[t];
+        return g;
+      };
+      const rhsN = new Float64Array(NU);
+      for (let t = 0; t < nTerm; t++) rhsN[sIdx[t]] += rhs[eqOf[t]] * wArr[t];
+      const sol = cgNormal(applyN, rhsN, S, CGS);
+      S.set(sol);
+    }
+    // --- K step: source held ---
+    if (K2D) {
+      const NK = NB * NB;
+      const spread4 = (t, out, val) => {
+        const a = byi[t], c = bxi[t], u = fyf[t], v = fxf[t];
+        out[a * NB + c] += val * (1 - u) * (1 - v); out[(a + 1) * NB + c] += val * u * (1 - v);
+        out[a * NB + c + 1] += val * (1 - u) * v; out[(a + 1) * NB + c + 1] += val * u * v;
+      };
+      const applyN = kv => {
+        const o = new Float64Array(NEQ);
+        for (let t = 0; t < nTerm; t++) {
+          const a = byi[t], c = bxi[t], u = fyf[t], v = fxf[t];
+          o[eqOf[t]] += S[sIdx[t]] * (kv[a * NB + c] * (1 - u) * (1 - v) + kv[(a + 1) * NB + c] * u * (1 - v)
+            + kv[a * NB + c + 1] * (1 - u) * v + kv[(a + 1) * NB + c + 1] * u * v);
+        }
+        const g = new Float64Array(NK);
+        for (let t = 0; t < nTerm; t++) spread4(t, g, S[sIdx[t]] * o[eqOf[t]]);
+        for (let a = 0; a < NB; a++) for (let c = 0; c < NB; c++) {
+          const j = a * NB + c;
+          let L = 0;
+          if (a > 0 && a < NB - 1) L += 2 * kv[j] - kv[j - NB] - kv[j + NB];
+          if (c > 0 && c < NB - 1) L += 2 * kv[j] - kv[j - 1] - kv[j + 1];
+          g[j] += lam * L;
+        }
+        return g;
+      };
+      const rhsN = new Float64Array(NK);
+      for (let t = 0; t < nTerm; t++) spread4(t, rhsN, S[sIdx[t]] * rhs[eqOf[t]]);
+      K2 = cgNormal(applyN, rhsN, K2, CGK);
+    } else {
+      // hy with hx held, then hx with hy held — each a 41-unknown normal system.
+      // The design row must be accumulated PER EQUATION (an equation sums ~100
+      // source pixels before it is compared), not per term.
+      for (const axis of ['y', 'x']) {
+        const M = Array.from({ length: NB }, () => new Float64Array(NB + 1));
+        const row = new Float64Array(NB);
+        for (let e = 0; e < NEQ; e++) {
+          row.fill(0);
+          for (let t = eqStart[e]; t < eqStart[e + 1]; t++) {
+            const a = byi[t], c = bxi[t], u = fyf[t], v = fxf[t];
+            const other = axis === 'y' ? (hx[c] * (1 - v) + hx[c + 1] * v)
+              : (hy[a] * (1 - u) + hy[a + 1] * u);
+            const g = S[sIdx[t]] * other;
+            const n0 = axis === 'y' ? a : c, w0 = axis === 'y' ? 1 - u : 1 - v;
+            row[n0] += g * w0; row[n0 + 1] += g * (1 - w0);
+          }
+          for (let p = 0; p < NB; p++) {
+            if (!row[p]) continue;
+            for (let q = 0; q < NB; q++) if (row[q]) M[p][q] += row[p] * row[q];
+            M[p][NB] += row[p] * rhs[e];
+          }
+        }
+        for (let p = 0; p < NB; p++) {
+          const add = (q, v2) => { if (q >= 0 && q < NB) M[p][q] += v2; };
+          add(p, 2 * lam); add(p - 1, -lam); add(p + 1, -lam);
+        }
+        for (let c0 = 0; c0 < NB; c0++) {
+          let piv = c0;
+          for (let r2 = c0 + 1; r2 < NB; r2++) if (Math.abs(M[r2][c0]) > Math.abs(M[piv][c0])) piv = r2;
+          [M[c0], M[piv]] = [M[piv], M[c0]];
+          const d = M[c0][c0] || 1e-12;
+          for (let r2 = c0 + 1; r2 < NB; r2++) {
+            const f = M[r2][c0] / d;
+            if (!f) continue;
+            for (let q = c0; q <= NB; q++) M[r2][q] -= f * M[c0][q];
+          }
+        }
+        const out = new Float64Array(NB);
+        for (let r2 = NB - 1; r2 >= 0; r2--) {
+          let s = M[r2][NB];
+          for (let q = r2 + 1; q < NB; q++) s -= M[r2][q] * out[q];
+          out[r2] = s / (M[r2][r2] || 1e-12);
+        }
+        if (axis === 'y') hy = out; else hx = out;
+      }
+    }
+    refreshW();
+    console.log(`  ALS ${String(it + 1).padStart(2)}: RMS ${rmsNow(false).toFixed(3)} free, ` +
+      `${rmsNow(true).toFixed(3)} with the source clamped to [0,255]`);
+  }
+
+  // ---- report ---------------------------------------------------------------
+  let tot = 0, nExact = 0;
+  {
+    const o = new Float64Array(NEQ);
+    for (let t = 0; t < nTerm; t++) o[eqOf[t]] += Math.max(0, Math.min(255, S[sIdx[t]])) * wArr[t];
+    for (let e = 0, m = 0; m < used.length; m++) {
+      let bad = false;
+      for (let q = 0; q < TW * TH; q++, e++) {
+        let v = roundBy(o[e]); v = v < 0 ? 0 : v > 255 ? 255 : v;
+        const d = Math.abs(v - rhs[e]); tot += d; if (d) bad = true;
+      }
+      if (!bad) nExact++;
+    }
+  }
+  console.log(`  Σ|Δ| ${tot} = ${(tot / used.length).toFixed(1)} per glyph, ` +
+    `${(tot / inkBytes).toFixed(2)} per ink byte;  ${nExact} of ${used.length} byte-exact`);
+  if (!K2D) {
+    const m = h => { let s = 0, m1 = 0, m2 = 0;
+      for (let q = 0; q < NB; q++) { const t = B0 + q * BW; s += h[q]; m1 += h[q] * t; m2 += h[q] * t * t; }
+      return `Σ ${s.toFixed(3)} centroid ${(m1 / s).toFixed(3)} sd ${Math.sqrt(m2 / s - (m1 / s) ** 2).toFixed(3)}`; };
+    console.log(`  y kernel: ${m(hy)}   (tent ${KY} would be sd ${(ky.w / Math.sqrt(6)).toFixed(3)})`);
+    console.log(`  x kernel: ${m(hx)}   (tent ${KX} would be sd ${(kx.w / Math.sqrt(6)).toFixed(3)})`);
+  }
+  let sum = 0, mx = 0;
+  for (let j = 0; j < NU; j++) { const d = Math.max(0, Math.min(255, S[j])) - S0[j];
+    sum += Math.abs(d); if (Math.abs(d) > Math.abs(mx)) mx = d; }
+  console.log(`  free raster vs cour.ttf: mean |Δ| ${(sum / NU).toFixed(2)}, worst ${mx.toFixed(1)} bytes`);
+  console.log(`  READ THIS AGAINST --synth, NOT AGAINST ZERO: the same solve on a control with a` +
+    `\n  perfect shared raster floors near 0.13 bytes RMS, and near 3.6 once a 0.27 src px pen` +
+    `\n  scatter is injected. Only a real run ABOVE the jittered control is structural.`);
 }
 
 // ---- DO THE MARKERS SHARE ONE SOURCE RASTER? (model-free) --------------------
@@ -998,10 +1405,13 @@ if (flag('phase')) {
     `(centroid scatter ${sdC.toFixed(3)} px × slope ${beta2.toFixed(2)})  <- compare these two`);
   console.log(`  VERDICT: ${alpha2 < 1.5 * predicted
     ? 'CONSISTENT WITH THE PREMISE HOLDING, and not provable beyond that with this instrument. ' +
-      'The whole intercept is accounted for by the error in the phase itself, so there is no ' +
-      'evidence of a per-line source raster. What limits it is the centroid, whose scatter is ' +
-      'partly its own phase-dependent bias — a better phase estimator, not more markers, is ' +
-      'what would sharpen this. Treat the integer-pitch law as SUPPORTED but not proven.'
+      'The whole intercept is accounted for by the error in the phase itself. Do NOT read that ' +
+      'as "no per-line variation": this test infers phase from the ink CENTROID, whose scatter ' +
+      'is partly its own bias, and --solve-joint — which never touches the centroid and reads ' +
+      'the pixels directly — does see marker-to-marker inconsistency worth ~0.29 src px. A ' +
+      'better phase estimator, not more markers, is what would settle it. Treat the ' +
+      'integer-pitch law as SUPPORTED but not proven, and note that 1/sqrt(12) = 0.289 is what ' +
+      'a NON-INTEGER source pitch would produce.'
     : alpha2 < 0.5
     ? 'the premise HOLDS. D extrapolates to ~0 at zero phase, so two markers at the same phase ' +
       'ARE the same pixels — one source raster serves every line and the row pitch is a whole ' +

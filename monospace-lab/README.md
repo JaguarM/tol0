@@ -216,7 +216,13 @@ node monospace-lab/resample-fit.mjs --null                   # certify the harne
 node monospace-lab/resample-fit.mjs --em 2500,2600,10 --fy 2.88,3.00,0.02
 node monospace-lab/resample-fit.mjs --aspect 1.00,1.09,0.015 --fy 3.125 --ky tri:3.125
 node monospace-lab/resample-fit.mjs --solve-y --dump          # the structural tests
+node monospace-lab/resample-fit.mjs --synth --solve-joint     # ALWAYS beside a real run
 ```
+
+**Every structural verdict here is a comparison against `--synth`, never
+against zero.** The solves below are floored by their own approximations and by
+the shared-raster premise; two of them were misread for two sessions because
+nobody had measured the floor.
 
 **Run `--null` before reading any fit.** At scale 1 with `box:1` kernels the
 resample is the identity, so the whole path — render, fz composite, resample,
@@ -251,27 +257,57 @@ Fitting has plateaued near 185 per glyph and no parameter search has moved it,
 so the useful questions are no longer "which kernel" but "is it the kernel at
 all". Both of these answer a whole hypothesis family at once:
 
+- **`--synth`** — the positive control, and **run it beside every solve below**.
+  The null certifies the forward path at *scale 1*, where the resample is the
+  identity, so it never touched the solves that live inside the resample. This
+  replaces every target with the forward model's own output at a known
+  configuration, so each solve has a known answer and must find it;
+  `--synth-jitter` scatters the pen off the line by a stated sd, which is how
+  you find out what a floor is *made of*. Two of the verdicts on this page were
+  wrong until it existed. Generation checks itself: regenerate and re-fit with
+  the same config and the harness returns 0.0 per glyph, 57/57 byte-exact.
 - **`--solve-y` / `--solve-x`** — the downscale is *linear* in its kernel taps,
   so an arbitrary non-parametric kernel can be solved exactly by least squares,
   and the 57 markers supply the 57 y phases that identify one. Neither axis
-  collapses: a free vertical kernel scores 194.6 and cannot even beat the
-  two-parameter tent; a free horizontal one reaches 169.2 only by ringing its
-  taps (41 taps against 8 x phases is underdetermined) and still leaves 0 of 57
-  byte-exact. **No resample of any kind explains this page** — the missing term
-  is upstream, in the source render.
+  collapses: free kernels score 186.5 (y) and 169.2 (x) against **measured
+  floors of 6.0 and 1.2**. Freeing the vertical filter entirely moves 186.8 to
+  186.5 — nothing. This is the same refutation the file used to state as "a
+  free kernel cannot even beat the tent's 186.7", which was an artifact: the
+  tent was scored through `axisW`'s exact continuous weights and the free
+  kernel through binned taps, two different objectives. Assigning a source
+  pixel to its *nearest* tap node also quantises a continuous offset, flooring
+  the solve at 53.7 / 23.2 per glyph on data a tent explains exactly;
+  **linear interpolation between nodes** is what makes the verdict readable
+  (`--tap-nearest` reproduces the old numbers).
 - **`--solve-src`** — the same idea aimed at the SOURCE instead of the filter:
   the downscale is linear in the source pixels too, so solve for the source
-  raster itself (2091 free pixels, 10260 equations). **Read its caution.** Its
-  floor is 3.851 bytes and looks structural until you notice it is the same at
-  every geometry while cour.ttf's own residual swings 4.5–6.1 — it is
-  measuring its own premise, that all 57 markers share one raster.
+  raster itself. Its floor of 3.851 bytes is **not structural and says nothing
+  about the resample**: on a control it is 0.133 with a perfect shared raster
+  and 3.904 once a per-line sub-pixel phase scatter of one source pixel is
+  injected and nothing else is wrong. That also explains why it is the same at
+  every geometry — a phase scatter does not care about `fy`.
+- **`--solve-joint` (`--k2d`)** — free source *and* free kernel together, which
+  is bilinear, so alternating least squares. With `--k2d` the kernel is
+  non-separable too, and the model becomes the most general linear downscale
+  there is: any source image whatsoever through any fixed 2D filter whatsoever.
+  It does not refute the downscale — real page 3.836 / 3.641 against 3.854 for
+  the jittered control, i.e. the floor of the shared-raster premise. The
+  positive result is the one worth having: **with the source free to be any
+  image at all, the solved kernels come back at the tent pair** (y sd 1.069 vs
+  tri:2.63's 1.074, x 1.258 vs tri:3.125's 1.276). It is also the sharpest
+  instrument for `fy` in this repo — 5.096 / 4.160 / **3.837** / 3.842 / 3.900
+  / 4.679 over 2.9280…2.9304, good to ±0.0005 against `--ofat`'s ±0.04.
 - **`--phase`** — that premise, tested model-free off page pixels alone, plus
   the sharpest pitch this repo has. It measures the row pitch from ink
   centroids (**14.33868 ± 0.00073 px**, which excludes the row detector's
   14.3260 by 17σ), then asks whether markers at equal phase carry equal
   windows. They do, to within the precision of the phase itself: the
   zero-phase intercept is 1.095 bytes/px against 1.117 predicted by centroid
-  scatter alone. **Anchor on the continuous centroid line, never on detected
+  scatter alone. **Do not read that as "no per-line variation"** — it infers
+  phase from the ink centroid, whose scatter is partly its own bias, while
+  `--solve-joint` reads the pixels directly and does see marker-to-marker
+  inconsistency worth ~0.29 source px.
+  **Anchor on the continuous centroid line, never on detected
   ink** — an ink-top anchor is an integer row that jumps ±1 with phase, and
   that whole-pixel shift swamps the sub-pixel effect being measured (it moved
   the intercept 3.256 → 1.095 and flipped the verdict).
