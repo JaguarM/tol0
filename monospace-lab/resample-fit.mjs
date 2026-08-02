@@ -626,7 +626,9 @@ if (flag('synth')) {
   const skx = parseK(opt('synth-kx', KX)), sky = parseK(opt('synth-ky', KY));
   const sem = +opt('synth-em', String(b.em));
   const jit = +opt('synth-jitter', '0');
+  const PHI = +opt('synth-phi', '0');
   const P42 = +opt('pitch', '42');
+  const PSRC = +opt('synth-pitch', String(P42));
   EMY = Math.round(sem * b.aspect * 32) / 32;
   geometry(b.fy);
   if (src.length !== SW * SH) { src = new Uint8Array(SW * SH); clone.W = SW * SUPER; clone.H = SH * SUPER; }
@@ -640,17 +642,34 @@ if (flag('synth')) {
   for (const i of used) {
     const WXs = axisW(i.TX0, TW, FX, i.SX0, SW, skx);
     const WYs = axisW(i.TY0, TH, b.fy, i.SY0, SH, sky);
-    const dj = jit ? Math.round((rnd() * 2 - 1) * Math.sqrt(3) * jit * 64) : 0;  // uniform, sd = jit
+    // Three distinct generators, and telling them apart is the whole point:
+    //   --synth-jitter  RANDOM per-line scatter — the negative control for the
+    //                   pitch scan, which must NOT find a fractional pitch.
+    //   --synth-pitch   a genuine non-integer SOURCE PITCH. Line k moves to
+    //                   Y0 + P·k, so the departure from the model's 42·k fold is
+    //                   a LINEAR DRIFT of (P−42)·k — 12 px over this page at
+    //                   P = 42.207, not a sub-pixel effect at all.
+    //   --synth-phi     a WRAPPED sawtooth frac(k·phi) about an integer pitch:
+    //                   sub-pixel per-line wobble, which is a different physics
+    //                   from --synth-pitch and the one the scan actually fits.
+    const dj = PHI ? Math.round((PHI * i.k - Math.round(PHI * i.k)) * 64)
+      : jit ? Math.round((rnd() * 2 - 1) * Math.sqrt(3) * jit * 64) : 0;
     const px64 = Math.round((b.line.X0 - i.SX0) * 64);
-    const py64 = Math.round((b.line.Y0 + P42 * i.k - i.SY0) * 64) + dj;
+    const py64 = Math.round((b.line.Y0 + PSRC * i.k - i.SY0) * 64) + dj;
     if (!render(sem, px64, py64)) { console.error('synth: no raster'); process.exit(2); }
     i.target = forward(i, WXs, WYs);
+    // Kept so --solve-phase can be scored against the truth: the jitter is a
+    // real pen shift, which RE-RASTERISES the glyph, while the solve models a
+    // shift of the SAMPLING against a fixed raster. Whether those are the same
+    // thing to 0.02 px is exactly what this control decides.
+    i.injY = dj / 64;
   }
   inkBytes = countInk();
   SYNTH = { skx: opt('synth-kx', KX), sky: opt('synth-ky', KY), sem, jit };
   console.log(`\n*** SYNTHETIC TARGETS — THIS IS A CONTROL, NOT A MEASUREMENT OF THE PAGE ***`);
   console.log(`  generated: em64 ${sem}, fy ${b.fy}, x ${SYNTH.skx} / y ${SYNTH.sky}, ` +
-    `pen on an exact line, pitch ${P42} src px, jitter sd ${jit} src px`);
+    `pen ${PHI ? `on pitch ${PSRC} src px plus a WRAPPED sawtooth frac(k·${PHI})`
+      : `on a source pitch of ${PSRC} src px, jitter sd ${jit} src px`}`);
   console.log(`  the solves below are told x ${KX} / y ${KY} and must recover the rest.`);
   // Re-fit on the synthetic page: everything downstream reads b.line, so the
   // control must go through the same three stages the real data does.
@@ -1027,6 +1046,21 @@ if (flag('solve-joint')) {
   const lam = +opt('lambda', '30');
   const P42 = +opt('pitch', '42');
   const ALS = +opt('als', '8'), CGS = +opt('cg', '300'), CGK = +opt('cgk', '200');
+  // The fold need not assume an INTEGER pitch: round(P·k) puts the whole-pixel
+  // part of any pitch into S's indexing and leaves the sub-pixel remainder to
+  // the phase step. At integer P this is identical to the old fold, so nothing
+  // before it changes.
+  //
+  // TRAP, and it produced a wrong result that stood for an hour: sweeping --pitch
+  // while holding --fy is INCOHERENT. The two are not independent — the OUTPUT
+  // row pitch is a property of the page, so P and fy must satisfy
+  // P = 14.33868·fy, and moving P alone silently moves the implied output pitch.
+  // That sweep shows a sharp "minimum" at P = 42 which is nothing but the
+  // output-pitch mismatch it created. Swept coherently (fy = P/14.33868) the
+  // objective is FLAT, because --solve-phase absorbs a fold error of δ per row
+  // exactly. Freeing the phase DESTROYS the pitch information; the pitch is only
+  // identifiable with the phases constrained.
+  const fold = k => Math.round(P42 * k);
   EMY = b.emy;
   geometry(b.fy);
   clone.cache.clear();
@@ -1044,7 +1078,7 @@ if (flag('solve-joint')) {
       const cy = (i.TY0 + Y + 0.5) * b.fy, cx = (i.TX0 + X + 0.5) * FX;
       let n = 0;
       for (let sy = Math.ceil(cy - R - 0.5); sy <= Math.floor(cy + R - 0.5); sy++) {
-        const sRel = sy - P42 * i.k;
+        const sRel = sy - fold(i.k);
         if (sRel < sLo) sLo = sRel; if (sRel > sHi) sHi = sRel;
         for (let sx = Math.ceil(cx - R - 0.5); sx <= Math.floor(cx + R - 0.5); sx++) {
           if (sx < cLo) cLo = sx; if (sx > cHi) cHi = sx;
@@ -1057,6 +1091,9 @@ if (flag('solve-joint')) {
   const NR = sHi - sLo + 1, NC = cHi - cLo + 1, NU = NR * NC;
   const sIdx = new Int32Array(nTerm), byi = new Int32Array(nTerm), bxi = new Int32Array(nTerm);
   const fyf = new Float64Array(nTerm), fxf = new Float64Array(nTerm);
+  // The node coordinate BEFORE any per-marker phase offset is applied. Keeping
+  // it lets --solve-phase move a marker's sampling without rebuilding anything.
+  const tyu = new Float64Array(nTerm), txu = new Float64Array(nTerm);
   const rhs = new Float64Array(NEQ);
   {
     let e = 0, t = 0;
@@ -1064,19 +1101,44 @@ if (flag('solve-joint')) {
       const cy = (i.TY0 + Y + 0.5) * b.fy, cx = (i.TX0 + X + 0.5) * FX;
       rhs[e] = i.target[Y * TW + X];
       for (let sy = Math.ceil(cy - R - 0.5); sy <= Math.floor(cy + R - 0.5); sy++) {
-        const uy = (sy + 0.5 - cy - B0) / BW, y0 = Math.floor(uy);
-        const sRel = sy - P42 * i.k - sLo;
+        const uy = (sy + 0.5 - cy - B0) / BW;
+        const sRel = sy - fold(i.k) - sLo;
         for (let sx = Math.ceil(cx - R - 0.5); sx <= Math.floor(cx + R - 0.5); sx++, t++) {
-          const ux = (sx + 0.5 - cx - B0) / BW, x0 = Math.floor(ux);
+          const ux = (sx + 0.5 - cx - B0) / BW;
           sIdx[t] = sRel * NC + (sx - cLo);
-          byi[t] = y0; fyf[t] = uy - y0;
-          bxi[t] = x0; fxf[t] = ux - x0;
+          tyu[t] = uy; txu[t] = ux;
         }
       }
     }
   }
-  const eqOf = new Int32Array(nTerm);
-  for (let e = 0; e < NEQ; e++) for (let t = eqStart[e]; t < eqStart[e + 1]; t++) eqOf[t] = e;
+  const eqOf = new Int32Array(nTerm), mkOf = new Int32Array(NEQ);
+  for (let e = 0; e < NEQ; e++) {
+    mkOf[e] = Math.floor(e / (TH * TW));
+    for (let t = eqStart[e]; t < eqStart[e + 1]; t++) eqOf[t] = e;
+  }
+  // ---- per-marker sub-pixel phase ------------------------------------------
+  // The one thing every multi-instance solve here holds FIXED, and the thing
+  // that floors them all: markers are assumed to sit at exactly 42·k source px,
+  // so any real departure shows up as residual no free source or kernel can
+  // absorb. Freeing it turns that floor into a MEASUREMENT — dY is then each
+  // marker's source-space offset, and its distribution is what says whether the
+  // source row pitch is an integer.
+  //
+  // A pen shift really RE-RASTERISES the glyph; this models it as a shift of
+  // the sampling against a fixed raster. --synth --synth-jitter scores that
+  // approximation against a known truth rather than assuming it.
+  const PHASE = flag('solve-phase');
+  const dY = new Float64Array(used.length);
+  const setNodes = () => {
+    for (let t = 0; t < nTerm; t++) {
+      const uy = tyu[t] + dY[mkOf[eqOf[t]]] / BW, ux = txu[t];
+      let a = Math.floor(uy); if (a < 0) a = 0; else if (a > NB - 2) a = NB - 2;
+      let c = Math.floor(ux); if (c < 0) c = 0; else if (c > NB - 2) c = NB - 2;
+      byi[t] = a; fyf[t] = Math.max(0, Math.min(1, uy - a));
+      bxi[t] = c; fxf[t] = Math.max(0, Math.min(1, ux - c));
+    }
+  };
+  setNodes();
 
   // ---- the unknowns ---------------------------------------------------------
   // S starts at what cour.ttf actually renders, so the solve reports a delta;
@@ -1088,7 +1150,7 @@ if (flag('solve-joint')) {
     render(b.em, px0, py0);
     for (let s = 0; s < SH; s++)
       for (let c = 0; c < SW; c++) {
-        const sr = s + used[0].SY0 - P42 * used[0].k - sLo, cr = c + used[0].SX0 - cLo;
+        const sr = s + used[0].SY0 - fold(used[0].k) - sLo, cr = c + used[0].SX0 - cLo;
         if (sr >= 0 && sr < NR && cr >= 0 && cr < NC) S[sr * NC + cr] = src[s * SW + c];
       }
   }
@@ -1240,9 +1302,43 @@ if (flag('solve-joint')) {
         if (axis === 'y') hy = out; else hx = out;
       }
     }
+    // --- phase step: source and kernel held, each marker's offset free ---
+    if (PHASE) {
+      const markerCost = (m, d) => {
+        let s = 0;
+        const e0 = m * TH * TW, e1 = e0 + TH * TW, sh = d / BW;
+        for (let e = e0; e < e1; e++) {
+          let a = 0;
+          for (let t = eqStart[e]; t < eqStart[e + 1]; t++) {
+            const uy = tyu[t] + sh, ux = txu[t];
+            let p = Math.floor(uy); if (p < 0) p = 0; else if (p > NB - 2) p = NB - 2;
+            let q = Math.floor(ux); if (q < 0) q = 0; else if (q > NB - 2) q = NB - 2;
+            const u = Math.max(0, Math.min(1, uy - p)), v = Math.max(0, Math.min(1, ux - q));
+            a += S[sIdx[t]] * (K2D
+              ? K2[p * NB + q] * (1 - u) * (1 - v) + K2[(p + 1) * NB + q] * u * (1 - v)
+                + K2[p * NB + q + 1] * (1 - u) * v + K2[(p + 1) * NB + q + 1] * u * v
+              : (hy[p] * (1 - u) + hy[p + 1] * u) * (hx[q] * (1 - v) + hx[q + 1] * v));
+          }
+          s += (a - rhs[e]) ** 2;
+        }
+        return s;
+      };
+      for (let m = 0; m < used.length; m++) {
+        let bd = Infinity, bv = dY[m];
+        for (let d = -0.8; d <= 0.8001; d += 0.05) { const c = markerCost(m, d); if (c < bd) { bd = c; bv = d; } }
+        for (let step = 0.025; step > 0.0004; step /= 2)
+          for (const d of [bv - step, bv + step]) { const c = markerCost(m, d); if (c < bd) { bd = c; bv = d; } }
+        dY[m] = bv;
+      }
+      let mu = 0; for (let m = 0; m < used.length; m++) mu += dY[m];
+      mu /= used.length;
+      for (let m = 0; m < used.length; m++) dY[m] -= mu;   // the global shift is S's job
+      setNodes();
+    }
     refreshW();
     console.log(`  ALS ${String(it + 1).padStart(2)}: RMS ${rmsNow(false).toFixed(3)} free, ` +
-      `${rmsNow(true).toFixed(3)} with the source clamped to [0,255]`);
+      `${rmsNow(true).toFixed(3)} with the source clamped to [0,255]` +
+      (PHASE ? `,  phase sd ${Math.sqrt(dY.reduce((s, v) => s + v * v, 0) / dY.length).toFixed(3)} src px` : ''));
   }
 
   // ---- report ---------------------------------------------------------------
@@ -1275,6 +1371,88 @@ if (flag('solve-joint')) {
   console.log(`  READ THIS AGAINST --synth, NOT AGAINST ZERO: the same solve on a control with a` +
     `\n  perfect shared raster floors near 0.13 bytes RMS, and near 3.6 once a 0.27 src px pen` +
     `\n  scatter is injected. Only a real run ABOVE the jittered control is structural.`);
+
+  // ---- what the phases say --------------------------------------------------
+  if (PHASE) {
+    const n = used.length;
+    const sdD = Math.sqrt(dY.reduce((s, v) => s + v * v, 0) / n);
+    // A DRIFT proportional to k is a pitch error; SCATTER about that line is not.
+    const ks = used.map(i => i.k), mk = mean(ks), md = mean([...dY]);
+    let num = 0, den = 0;
+    for (let m = 0; m < n; m++) { num += (ks[m] - mk) * (dY[m] - md); den += (ks[m] - mk) ** 2; }
+    const slope = num / den;
+    const res = dY.map((v, m) => v - (md + slope * (ks[m] - mk)));
+    const sdR = Math.sqrt(res.reduce((s, v) => s + v * v, 0) / n);
+    console.log(`\n  PER-MARKER PHASE (${n} markers, source px, mean removed):`);
+    console.log(`    sd ${sdD.toFixed(3)}, range ${Math.min(...dY).toFixed(3)} .. ${Math.max(...dY).toFixed(3)}`);
+    console.log(`    drift vs row index: ${slope.toFixed(5)} src px per row  ` +
+      `(= a source pitch of ${(P42 + slope).toFixed(4)}, i.e. an output pitch of ` +
+      `${((P42 + slope) / b.fy).toFixed(5)});  scatter about that line sd ${sdR.toFixed(3)}`);
+    // Uniform over one source px is what a NON-INTEGER pitch gives (sd 0.289);
+    // a ¼-px pen lattice gives a 4-point comb. Both are testable here.
+    const q4 = Math.sqrt(dY.reduce((s, v) => { const r = v - Math.round(v * 4) / 4; return s + r * r; }, 0) / n);
+    console.log(`    distance to the nearest ¼-src-px lattice: rms ${q4.toFixed(3)} ` +
+      `(a ¼-px pen lattice would give ~0; uniform phases give 0.072)`);
+    // IS THE SCATTER DETERMINISTIC? A non-integer source row pitch P42 + phi
+    // puts marker k at phase frac(k·phi), so ONE number would explain all 57 —
+    // and the integer-pitch law says phi = 0, i.e. no scatter at all. Jitter, by
+    // contrast, is explained by no phi. Scan it: sharp minimum -> the pitch is
+    // measured and the law is wrong; flat -> the lines really do jitter.
+    {
+      const circ = v => v - Math.round(v);
+      const at = phi => {
+        let sc = 0, ss = 0;
+        for (let m = 0; m < n; m++) {
+          const d = 2 * Math.PI * (dY[m] - ks[m] * phi);
+          sc += Math.cos(d); ss += Math.sin(d);
+        }
+        const c = Math.atan2(ss, sc) / (2 * Math.PI);
+        let s = 0;
+        for (let m = 0; m < n; m++) { const r = circ(dY[m] - ks[m] * phi - c); s += r * r; }
+        return Math.sqrt(s / n);
+      };
+      let best = { phi: 0, rms: Infinity };
+      const all = [];
+      for (let phi = 0; phi < 1; phi += 1e-5) {
+        const rms = at(phi);
+        all.push(rms);
+        if (rms < best.rms) best = { phi, rms };
+      }
+      for (let step = 5e-6; step > 1e-9; step /= 2)
+        for (const p of [best.phi - step, best.phi + step]) {
+          const rms = at(p);
+          if (rms < best.rms) best = { phi: p, rms };
+        }
+      all.sort((p, q) => p - q);
+      const near = all.filter(v => v < 2 * best.rms).length;
+      console.log(`    DETERMINISTIC PITCH SCAN: best fractional pitch ${best.phi.toFixed(6)} ` +
+        `-> residual rms ${best.rms.toFixed(4)} src px`);
+      console.log(`      median over the scan ${all[all.length >> 1].toFixed(3)}, ` +
+        `${near} of ${all.length} grid points within 2x of the best`);
+      const wrapped = Math.min(best.phi, 1 - best.phi);
+      console.log(`      ${best.rms >= 0.05
+        ? 'FLAT — no single fractional rate explains the phases, so they are genuine per-line ' +
+          'jitter rather than anything periodic.'
+        : wrapped < 1e-3
+        ? `phi is 0 to within ${wrapped.toFixed(6)} — the markers sit at ONE phase, which is what ` +
+          `an exactly integer source pitch of ${P42} looks like. Nothing to explain.`
+        : `SHARP at phi ${best.phi.toFixed(6)} — the sub-pixel phases are DETERMINISTIC in k. ` +
+          `CAREFUL: this is a WRAPPED sawtooth, which is NOT the same thing as a source pitch of ` +
+          `${(P42 + best.phi).toFixed(5)} — that would drift ${((best.phi) * 60).toFixed(1)} px over ` +
+          `the page and could never stay inside this search. Compare --synth-pitch (a real ` +
+          `non-integer pitch) against --synth-phi (a sub-pixel wobble about an integer one) ` +
+          `before reading a pitch off this number.`}`);
+    }
+    if (SYNTH && used.some(i => i.injY)) {
+      const inj = used.map(i => i.injY), mi = mean(inj);
+      const err = dY.map((v, m) => v - (inj[m] - mi));
+      const sdE = Math.sqrt(err.reduce((s, v) => s + v * v, 0) / n);
+      let c = 0, vi = 0, vd = 0;
+      for (let m = 0; m < n; m++) { c += (inj[m] - mi) * (dY[m] - md); vi += (inj[m] - mi) ** 2; vd += (dY[m] - md) ** 2; }
+      console.log(`    RECOVERY vs the injected truth: residual sd ${sdE.toFixed(3)} src px, ` +
+        `r ${(c / Math.sqrt(vi * vd)).toFixed(4)}  <- this is the estimator's PRECISION`);
+    }
+  }
 }
 
 // ---- DO THE MARKERS SHARE ONE SOURCE RASTER? (model-free) --------------------

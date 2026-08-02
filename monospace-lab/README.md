@@ -297,6 +297,31 @@ all". Both of these answer a whole hypothesis family at once:
   tri:2.63's 1.074, x 1.258 vs tri:3.125's 1.276). It is also the sharpest
   instrument for `fy` in this repo — 5.096 / 4.160 / **3.837** / 3.842 / 3.900
   / 4.679 over 2.9280…2.9304, good to ±0.0005 against `--ofat`'s ±0.04.
+- **`--solve-phase`** — frees each marker's sub-pixel offset as a third ALS
+  block, which is what every other solve here holds fixed and what floors them
+  all. Certified both ways before use: sd 0.002 src px on a perfect page, and an
+  injected jitter recovered at residual sd **0.011 src px**, r 0.9993. It takes
+  the real page from RMS 3.836 to **1.647**, so the phase was ~80 % of the
+  floor. The phases are **deterministic, not jitter**: one wrapped sawtooth
+  `frac(k·0.206929)` fits all 57 to 0.021 src px, where the same scan returns
+  0.227 on randomly jittered data. Source line gaps are therefore 42.207 or
+  41.207 src px — one source pixel apart — averaging 42.0002. *What produces
+  that wobble is not identified.*
+- **`--pitch`, with `--synth-pitch` / `--synth-phi`** — a sub-pixel wobble about
+  an integer pitch and a genuine non-integer pitch are different physics (the
+  second drifts `(P−42)·k`, 12 px over this page), and these generate each so
+  they can be told apart: a true 42.2069 folded at 42 blows up to RMS 11 with
+  the kernels collapsing, while a wrapped sawtooth about 42 reproduces the page.
+  So the line positions are bounded within ±0.5 src px of 42·k, and a genuine
+  non-integer pitch is excluded. **But this does not measure the pitch.**
+  Sweeping the fold looks like a sharp minimum at 42 (15.615 / 7.866 / 1.803 /
+  1.648 / 1.759 / 6.134 over 41.9…42.05) only if you hold `fy` while moving `P`
+  — and those are not independent, since the *output* pitch is a page property
+  and a coherent sweep must co-vary `fy = P/14.33868`. Done coherently it is
+  **flat**: 1.648 / 1.648 / 1.652 / 1.652 / 1.647 / 1.650 over 42.0…43.0.
+  Freeing the phase destroys the pitch information, because a fold error of δ
+  per row is exactly what a per-marker offset absorbs. The integer-pitch law
+  therefore still rests on the *constrained* `n = 40..45` sweep, not on this.
 - **`--phase`** — that premise, tested model-free off page pixels alone, plus
   the sharpest pitch this repo has. It measures the row pitch from ink
   centroids (**14.33868 ± 0.00073 px**, which excludes the row detector's
