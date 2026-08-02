@@ -212,37 +212,110 @@ incommensurate with the resample period), so one configuration has to explain
 sixty different y phases with a single pen origin.
 
 ```bash
-node monospace-lab/resample-fit.mjs --em 2560,2660,4 --sigma 0.32,0.40,0.48
-node monospace-lab/resample-fit.mjs --doc <other.pdf> --em 3100,3300,4   # a 12 pt source
+node monospace-lab/resample-fit.mjs --null                   # certify the harness first
+node monospace-lab/resample-fit.mjs --em 2500,2600,10 --fy 2.88,3.00,0.02
+node monospace-lab/resample-fit.mjs --aspect 1.00,1.09,0.015 --fy 3.125 --ky tri:3.125
+node monospace-lab/resample-fit.mjs --solve-y --dump          # the structural tests
 ```
 
-Two stages, deliberately separate. **FIT** lets each pen float, so a wrong
-(em64, kernel) cannot hide behind one lucky alignment. **PHYSICS** then checks
-that the fitted pens lie on one line — a config that scores well only by
-scattering its pens has not found the producer.
+**Run `--null` before reading any fit.** At scale 1 with `box:1` kernels the
+resample is the identity, so the whole path — render, fz composite, resample,
+pen line, scoring — must reproduce a *native* courier page byte-exactly. It
+does: 57/57 leading `>` on `corpus-cour832` p2, and it recovers that page's
+15.0000 row pitch without being told it. That null is what makes a non-zero
+score on the suspect mean something.
 
-Measured on `courir-strech/EFTA02154109` p2, 2026-07-31:
+Three stages, deliberately separate. **FIT** lets each pen float inside a small
+box, so a wrong (em64, factor, kernel) cannot hide behind one lucky alignment.
+**LINE** then requires the fitted pens to collapse onto one line — robustly, 2σ
+rejection then a refinement over (X0, Y0, pitch) — because the producer has one
+pen origin and one pitch, not sixty free choices. **SCORE** re-fits with pens
+*predicted* from that line. That last number is the objective; stage A's is not.
+
+Measured on `courir-strech/EFTA02154109` p2, 2026-08-02:
 
 ```
-BEST em64 2604  σx 0.40  σy 0.40          = 40.69 source px = 9.77 pt at 300 dpi
-PHYSICS  pen x sd 0.000 source px         (all markers share a column ✓)
-         pen y pitch 14.3359 output px    vs 14.3260 measured independently ✓
-         residual sd 0.290 source px
-VERIFY   40 markers, pens PREDICTED from that line: 2.67 per byte
+BEST  em64 2540  fy 2.92  tri:3.125 / tri:2.63   186.7 Σ|Δ| per glyph, 0/57 exact
+      pen x sd 0.122 src px          (all markers share a column ✓)
+      pitch 14.3386 output px        vs 14.3260 measured independently ✓
 ```
 
 The physics check passing is the substantive result: **one pen origin and one
 pitch place every marker**, and the fitted row pitch matches the page's own to
-0.01 px without being told it. The recipe is therefore right in its geometry
-and still wrong in its greys — `2.67 per byte over 4,000 bytes` is the number a
-correct recipe drives to 0, and it is the honest objective. The old
-single-glyph score is not; it was small because it was easy.
+0.01 px without being told it. The recipe is right in its geometry and wrong in
+its greys.
 
-**em64 lands on 2600, not 3200.** 2600 = 832 × 25/8 exactly — i.e. the source
-is `cour13` (the readable courier family's own size, 13 px at 96 dpi) rendered
-at 300 dpi. If other documents in the corpus are Courier **12 pt**, that is
-em64 3200 at 300 dpi and a different sub-family; point this tool at them with
-`--em 3100,3300,4` and let the physics check say so.
+### The two structural tests, which is what this tool is now for
+
+Fitting has plateaued near 185 per glyph and no parameter search has moved it,
+so the useful questions are no longer "which kernel" but "is it the kernel at
+all". Both of these answer a whole hypothesis family at once:
+
+- **`--solve-y` / `--solve-x`** — the downscale is *linear* in its kernel taps,
+  so an arbitrary non-parametric kernel can be solved exactly by least squares,
+  and the 57 markers supply the 57 y phases that identify one. Neither axis
+  collapses: a free vertical kernel scores 194.6 and cannot even beat the
+  two-parameter tent; a free horizontal one reaches 169.2 only by ringing its
+  taps (41 taps against 8 x phases is underdetermined) and still leaves 0 of 57
+  byte-exact. **No resample of any kind explains this page** — the missing term
+  is upstream, in the source render.
+- **`--solve-src`** — the same idea aimed at the SOURCE instead of the filter:
+  the downscale is linear in the source pixels too, so solve for the source
+  raster itself (2091 free pixels, 10260 equations). **Read its caution.** Its
+  floor is 3.851 bytes and looks structural until you notice it is the same at
+  every geometry while cour.ttf's own residual swings 4.5–6.1 — it is
+  measuring its own premise, that all 57 markers share one raster.
+- **`--phase`** — that premise, tested model-free off page pixels alone, plus
+  the sharpest pitch this repo has. It measures the row pitch from ink
+  centroids (**14.33868 ± 0.00073 px**, which excludes the row detector's
+  14.3260 by 17σ), then asks whether markers at equal phase carry equal
+  windows. They do, to within the precision of the phase itself: the
+  zero-phase intercept is 1.095 bytes/px against 1.117 predicted by centroid
+  scatter alone. **Anchor on the continuous centroid line, never on detected
+  ink** — an ink-top anchor is an integer row that jumps ±1 with phase, and
+  that whole-pixel shift swamps the sub-pixel effect being measured (it moved
+  the intercept 3.256 → 1.095 and flipped the verdict).
+- **`--penq` / `--gridfit` / `--super` / `--law` / `--lut`** — the source-render
+  axes, all refuted 2026-08-03. `--lut` is the one worth knowing about: it
+  bounds *every* levels/gamma/tone-curve hypothesis at once by asking whether
+  the page byte is a function of the model's continuous value. It is not.
+- **`--dump`** — the residual averaged over all 57 y phases. Mean *signed* next
+  to mean *absolute*: where they agree the error is systematic, where the
+  signed map is ~0 under a large absolute one it is only phase noise. Here they
+  agree cell for cell, and the map is exactly zero on paper — the glyph's
+  extent is right and its greys are wrong.
+
+- **`--ofat`** — one factor at a time around a baseline, every factor on the
+  same objective. What matters is each variable's *shape*, not its best value:
+  a sharp interior minimum means the page identifies it, flat means the page
+  does not constrain it and any fitted value is noise. Spans in Σ|Δ|/glyph:
+  aspect 162, ky width 139, ky type 131, fx 111, fy 99, kx type 74, kx width
+  56, **em64 42**. `fx` has a sharp minimum at exactly **25/8** — which closes
+  the ambiguity the Δcol=48 identity left open, since that identity pins only
+  the *denominator* to 8. Both kernels are tents decisively. And em64 is the
+  flattest thing here, so **do not read a font size off this fit**; that is why
+  five sessions each reported a different one. The optima also do not combine —
+  taking every factor's best together scores *worse* than the baseline.
+
+### The geometry is pinned by a law, not a fit
+
+`--aspect` exists because the ~6 % vertical excess has two possible homes, and
+they are different physics: an anisotropic **resample** (`--fy` below `--fx`)
+squeezes a uniform render afterwards, while an anisotropic **text matrix**
+(`--aspect` above 1) stretches the outline *before* rasterization. They score
+186.7 and 195.1 and leave the same residual, so scoring cannot separate them.
+
+What separates them is the **producer's own layout law**, measured on the
+courier documents that already read: across all four `corpus-cour832`
+documents the row pitch is *exactly* 15.0000 device px and the pen origin is on
+the ¼-px lattice, while the column pitch is not integral — each line's text
+operator goes on an integer grid, advances run fractional. Requiring the same
+of the suspect's *source* render admits only `fy = n/14.3386`, and `n = 40..45`
+scores 224.5 / 195.1 / **186.9** / 197.9 / 229.8 / 275.6: a sharp winner at
+`n = 42`, `fy = 2.92916`, refining to **177.3 per glyph at em64 2530** with the
+pen origin landing on the ¼-px lattice unprompted. The text-matrix reading is
+refuted outright — it needs a source pitch of 44.81, and the nearest integer is
+3.7 px adrift over 61 rows.
 
 ## Files
 
