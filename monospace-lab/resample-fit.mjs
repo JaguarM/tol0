@@ -2163,6 +2163,28 @@ if (flag('solve-joint')) {
     require('node:fs').writeFileSync(resolve(REPO, opt('resid-out', '')), Buffer.from(r.buffer));
     console.log(`  residuals written to ${opt('resid-out', '')} (${NEQ} float64)`);
   }
+  // --model-out / --k-out: the fitted MODEL images, and the marker LINE INDICES.
+  // The k list is not cosmetic. Every phase analysis in this family keys on
+  // frac(k·θ), and until this flag existed there was no way to read k out of the
+  // solve at all — so scratch analyses ASSUMED the markers were consecutive from
+  // the first one. They are not: a page whose detector drops a row leaves a gap,
+  // and a gap silently misassigns the phase of every marker after it, which
+  // ATTENUATES a real key rather than fabricating one. Dump k with the residuals
+  // or the phase you compute is a different page's.
+  if (opt('model-out', '')) {
+    const o = new Float64Array(NEQ);
+    for (let t = 0; t < nTerm; t++) o[eqOf[t]] += S[sIdx[t]] * wArr[t];
+    require('node:fs').writeFileSync(resolve(REPO, opt('model-out', '')), Buffer.from(o.buffer));
+    console.log(`  model images written to ${opt('model-out', '')} (${NEQ} float64, ${used.length}x${TH}x${TW})`);
+  }
+  if (opt('k-out', '')) {
+    const ka = Int32Array.from(used.map(i => i.k));
+    require('node:fs').writeFileSync(resolve(REPO, opt('k-out', '')), Buffer.from(ka.buffer));
+    const gaps = [];
+    for (let m = 1; m < ka.length; m++) if (ka[m] !== ka[m - 1] + 1) gaps.push(`${ka[m - 1]}->${ka[m]}`);
+    console.log(`  marker k written to ${opt('k-out', '')} (${ka.length} int32, k = ${ka[0]}..${ka[ka.length - 1]}` +
+      `, ${gaps.length ? `${gaps.length} GAP(S): ${gaps.join(' ')}` : 'consecutive, no gaps'})`);
+  }
   if (pinInfo) console.log(`  PHASES PINNED: amplitude ${pinInfo.A.toFixed(4)} src px, origin ${pinInfo.c.toFixed(4)}, ` +
     `and the free offsets departed from that sawtooth by ${pinInfo.resid.toFixed(4)} src px before projection ` +
     `(the 1x certified departure is 0.0212 — a larger one here is the source buying RMS with phase fidelity).`);
