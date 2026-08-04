@@ -1,5 +1,5 @@
 ---
-description: The page-downscale family (17 documents, 816×1073) — the residual is two-dimensional and its per-line phase rate is PINNED at 0.05942 on raw pixels; the open job is a mechanism
+description: The page-downscale family (17 documents, 816×1073) — the residual is two-dimensional and its per-line phase rate is PINNED at 0.0585 on raw pixels; the open job is a mechanism
 ---
 
 The `page-downscale-816x1073` family — **17 documents, 100 % □, no pool**. Not
@@ -26,11 +26,24 @@ what replaced them is a positive structural result plus one live rate:
 - **The plane's trajectory is ordered natively in line index**, and its
   autocorrelation *shape* (damped oscillation, zero crossing ~lag 4–5, trough at
   lag 9) distinguishes it from the solve's own artifact (monotone decay).
-- **THE RATE IS PINNED: θ = 0.05942 ± 0.00087** (08-04f), on the raw maps over
-  the full clean band, s = −0.5619 against a Mantel null minimum of −0.2020 in
-  400 draws, interior to the range, every control null. 16.83 lines per cycle.
-  Robust across four marker split-halves and the free-phase solve, and keyed in
-  map **shape** (unit-norm s = −0.5737), not amplitude.
+- **THE RATE IS PINNED: θ = 0.05850** (08-04f, re-measured on true marker
+  indices in 08-04h), on the raw maps over the full clean band, s = −0.5813
+  against a Mantel null minimum of −0.1710 in 400 draws, interior, every control
+  null. ~17.1 lines per cycle. Robust across four marker split-halves and the
+  free-phase solve, and keyed in map **shape**, not amplitude.
+- **The transfer curve is a SINUSOID** (08-04g): per-harmonic joint R²
+  58.5/2.0/0.5/0.8/0.1 % for h = 1..5 — the first harmonic carries **94 %**, and
+  the trajectory is an ellipse (basis-invariant axis ratio 0.807) traversed once
+  per cycle. Not a sawtooth, not a two-level alternation. A sawtooth state read
+  through a near-pure-sinusoid transfer means it enters **continuously**.
+- **The key owns ~1.155 of the 1.647 bytes** (share 59.8 % of the plane,
+  split-half stable). A generator carrying it perfectly still leaves ~1.18
+  against the 0.281 floor — **one mechanism does not close this family.**
+- **It is NOT a second, smaller pen wobble** (08-04h). Regressed on the model's
+  own derivative fields, dM/dy carries the key at R² 78.3 % and ∇²M at 72.9 %,
+  both clearing their null maxima — so a θ-keyed y displacement of **0.0152
+  output px** exists, 21× smaller than the φ wobble. But all four fields explain
+  only **2.8 %** of the residual while the key owns ~48 %.
 
 **That is a third accumulator with a measured rate.** It is still **not a stored
 constant** in the sense φ and u are, because no mechanism has been named.
@@ -57,19 +70,41 @@ instrument in the same run; that is the only reason this was caught.
 
 ### THE NEXT JOB
 
-**Ask for a mechanism.** Rate → mechanism → arithmetic, and the rate is now in
-hand. **No arithmetic on 0.0594 yet** — no rational near-miss hunting, and note
-that 1/16.83 is precisely the bait the ledger's 0.20692-vs-φ and m = 44 entries
-exist to refuse. A mechanism story must predict a form *first*.
+**A mechanism, and it now has a narrow specification to meet.** Rate → mechanism
+→ arithmetic. **No arithmetic on 0.0585 yet** — no rational near-miss hunting,
+and 1/17.1 is precisely the bait the ledger's 0.20692-vs-φ and m = 44 entries
+exist to refuse. The producer stored φ = 0.207037 and u = 0.205665 as raw
+constants matching nothing rational; its third owes nobody a clean fraction.
 
-What the mechanism must account for, all measured: the key is in map **shape**
-not amplitude; per-marker amplitude alone is keyed at only R² 32.6 % against a
-null max of 46.4 % (does not clear); the page carries **no index drift**
-(corr(map-distance, |kᵢ−kⱼ|) = −0.0222, against +0.5552 on the control).
+What the mechanism must be, all measured — this is the target, not a wish list:
+
+- **smooth in the phase** (94 % first harmonic), **elliptical in the plane**
+  (axis ratio 0.807 — two spatial patterns in near-quadrature, not one),
+- **orthogonal to all four first-order image deformations** — not a
+  displacement, not a gain change, not a blur of the fitted model (2.8 %),
+- worth **~1.155 of the 1.647 bytes**, leaving ~1.18 that something else owns,
+- keyed in map **shape** not amplitude (amplitude alone: R² 32.6 % against a
+  null max of 46.4 %, does not clear), on a page with **no index drift**
+  (corr(map-distance, |kᵢ−kⱼ|) = −0.0222, against +0.5552 on the control).
 
 Also unsurveyed and not to be described as empty: **θ ≳ 0.5**, where the scan
 recovers 1/12 even at full amplitude. The licensed sentence is "structure found
-at 0.0594", never "the only structure is at 0.0594".
+at 0.0585", never "the only structure is at 0.0585".
+
+### Two traps this session added
+
+- **THE MARKER LINE INDICES ARE NOT CONSECUTIVE.** 57 markers span k = 6..65,
+  gaps at 6→9 and 10→12. Every phase analysis before 08-04h assumed consecutive
+  k because the solve had no way to emit it. Use `--k-out` (it prints its gaps)
+  and `--model-out`. A gap misassigns the phase of every marker after it, which
+  *attenuates* a real key rather than fabricating one — the correction made the
+  statistic stronger, −0.5619 → −0.5813.
+- **`Buffer.buffer` is the POOLED ArrayBuffer.** Reading a dump with
+  `new Int32Array(readFileSync(f).buffer)` starts in whatever Node allocated
+  before it. Slice by `byteOffset`/`length`, and assert on a known first value —
+  this one announced itself as `k[0] = 92` and NaN R², but a subtler offset
+  would have produced plausible numbers. Another instance of the interpreting
+  layer being an instrument with no self-test.
 
 Reference document: `lab/base64/courir-strech/EFTA02154109.pdf` (83 pp; p2 is
 the prose cover, p3+ are base64 body pages — body pages are byte-identical in
