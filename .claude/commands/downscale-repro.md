@@ -1,5 +1,5 @@
 ---
-description: The page-downscale family (17 documents, 816×1073) — the residual is two-dimensional and carries a phase-keyed rate confirmed on raw pixels; pin the rate with a pre-declared null, then ask for a mechanism
+description: The page-downscale family (17 documents, 816×1073) — the residual is two-dimensional and its per-line phase rate is PINNED at 0.05942 on raw pixels; the open job is a mechanism
 ---
 
 The `page-downscale-816x1073` family — **17 documents, 100 % □, no pool**. Not
@@ -10,7 +10,7 @@ construction. Reading them at tolerance 0 requires reproducing the PIPELINE.
 Full record, with every number and every refutation:
 [lab/families.mjs](../../lab/families.mjs) → the `page-downscale-816x1073`
 entry. **Read that entry first** — this brief is the work order, that entry is
-the evidence, and it now compresses sixteen dated blocks (08-02 … 08-04e). Do
+the evidence, and it now compresses seventeen dated blocks (08-02 … 08-04f). Do
 not re-open anything the entry marks refuted; the list is long and every item
 on it cost a session.
 
@@ -26,38 +26,50 @@ what replaced them is a positive structural result plus one live rate:
 - **The plane's trajectory is ordered natively in line index**, and its
   autocorrelation *shape* (damped oscillation, zero crossing ~lag 4–5, trough at
   lag 9) distinguishes it from the solve's own artifact (monotone decay).
-- **A phase-keyed rate near 0.06–0.076 is CONFIRMED on raw pixels.** The θ scan
-  cleared a drift null's maximum on the loading pairs; the map-level check then
-  cleared a Mantel null's maximum on the **raw maps** at r = 0.0622, with every
-  control scoring null. Confirming instrument shares nothing with the discovering
-  one — that was the design.
+- **THE RATE IS PINNED: θ = 0.05942 ± 0.00087** (08-04f), on the raw maps over
+  the full clean band, s = −0.5619 against a Mantel null minimum of −0.2020 in
+  400 draws, interior to the range, every control null. 16.83 lines per cycle.
+  Robust across four marker split-halves and the free-phase solve, and keyed in
+  map **shape** (unit-norm s = −0.5737), not amplitude.
 
-**That is evidence for a third accumulator. It is NOT a stored constant yet**,
-because the rate is unpinned: the confirmation's maximum sat at **0.0756, the
-upper edge of its pre-stated window**. A boundary optimum means the true rate may
-lie outside. Nothing about mechanism or arithmetic may be claimed until it is
-pinned.
+**That is a third accumulator with a measured rate.** It is still **not a stored
+constant** in the sense φ and u are, because no mechanism has been named.
 
-### THE NEXT JOB, with its null declared here so the run cannot choose it
+### READ THIS BEFORE TRUSTING ANY EARLIER NUMBER: the statistic was backwards
 
-**Refine the rate on the raw maps, scanning the FULL clean band — no window.**
-Windowing is what produced the boundary optimum, and re-windowing after seeing it
-is the post-hoc move the whole chain exists to forbid.
+08-04e defined the confirming statistic as −corr(map-distance, phase-distance)
+and **maximised** it. A positive control it never had — inject known
+frac(k·θ₀)-keyed structure into deranged maps — shows s goes **negative**,
+monotonically, at every rate and amplitude. The hypothesis lives at the
+**minimum**; maximising searched the anti-relationship. Superseded:
 
-- **Statistic** (unchanged, no knob): −corr(map-distance, circular phase-distance
-  min(d, 1−d)) over all 1596 pairs of raw pinned maps.
-- **Range:** the full clean band ∩ the ≥3-wrap guard — [0.0508, 0.1731] ∪
-  [0.2409, 0.7591] ∪ [0.8269, 0.9492]. Remember θ and 1−θ are the *same*
-  hypothesis.
-- **Null:** Mantel label permutation, ≥300 draws, each taking the **global max
-  over the same full band**. Clearing that is the only thing that pins a rate.
-- **Then and only then:** ask for a mechanism. Rate → mechanism → arithmetic.
-  No rational near-miss hunting; the ledger already holds 0.20692-vs-φ and the
-  m = 44 rung.
+- "r = 0.0622 at θ = 0.0756, never quote as a strength" → correctly signed the
+  effect is **r = +0.56**, and it is large.
+- The boundary optimum at 0.0756 is **explained**, not outstanding: the window
+  straddled the real feature at 0.0594 and the wrong tail peaked at the edge.
+- The **08-04d loading scan is unaffected** — its joint R² is sign-blind — and
+  its 0.0596 now *agrees* with the pinned rate. The sign error was exactly what
+  had made the two instruments disagree.
+
+The alarm that caught it was the **no-quarry synth control clearing the same
+criterion as the page** on the full band. Keep running controls in the same
+instrument in the same run; that is the only reason this was caught.
+
+### THE NEXT JOB
+
+**Ask for a mechanism.** Rate → mechanism → arithmetic, and the rate is now in
+hand. **No arithmetic on 0.0594 yet** — no rational near-miss hunting, and note
+that 1/16.83 is precisely the bait the ledger's 0.20692-vs-φ and m = 44 entries
+exist to refuse. A mechanism story must predict a form *first*.
+
+What the mechanism must account for, all measured: the key is in map **shape**
+not amplitude; per-marker amplitude alone is keyed at only R² 32.6 % against a
+null max of 46.4 % (does not clear); the page carries **no index drift**
+(corr(map-distance, |kᵢ−kⱼ|) = −0.0222, against +0.5552 on the control).
 
 Also unsurveyed and not to be described as empty: **θ ≳ 0.5**, where the scan
 recovers 1/12 even at full amplitude. The licensed sentence is "structure found
-at ~0.06", never "the only structure is at ~0.06".
+at 0.0594", never "the only structure is at 0.0594".
 
 Reference document: `lab/base64/courir-strech/EFTA02154109.pdf` (83 pp; p2 is
 the prose cover, p3+ are base64 body pages — body pages are byte-identical in
