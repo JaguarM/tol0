@@ -413,6 +413,15 @@ export class FTClone {
     // FT loads at char size 65536/64 = 1024pt @72dpi: scale16.16 = DivFix(65536, upm)
     this.scale16 = divfix(65536, this.upm);
     this.cache = new Map();
+    // OUTLINE-POINT QUANTUM, in 26.6 units, 0 = off and 0 IS THE DEFAULT — this
+    // changes nothing unless a caller asks for it, and certify.mjs proves that.
+    // FreeType carries transformed points in 26.6, i.e. an implicit quantum of
+    // 1 unit; a producer whose transform pipeline held them coarser (1/16 or
+    // 1/8 px rather than 1/64) perturbs each glyph's SHAPE by an amount keyed to
+    // the sub-pixel pen position, so it differs line to line. That is the last
+    // per-line-rasterization mechanism the page's residual still admits, and
+    // monospace-lab/resample-fit.mjs --outq is what measures it.
+    this.outQ64 = 0;
     // Which era's gray_render_conic to walk. 'dda' is FreeType 2.10+, the one
     // certify.mjs proves against mupdf 1.28 — the default, always. 'ft261' is
     // the 2.4.12..2.6.2 recursive-subdivision rule, for producers older than
@@ -422,7 +431,7 @@ export class FTClone {
   setGidMap(map) { this.gidMap = map; }
   // coverage buffer for glyph cp at matrix [em64x,0,0,-em64y]/64 pen (px64,py64)/64
   coverage(cp, em64x, em64y, px64, py64) {
-    const key = `${cp}|${em64x}|${em64y}|${px64}|${py64}`;
+    const key = `${cp}|${em64x}|${em64y}|${px64}|${py64}|${this.outQ64}`;
     let cov = this.cache.get(key);
     if (cov) return cov;
     const R = new Raster(this.W, this.H);
@@ -458,9 +467,15 @@ export class FTClone {
       // em64 may be fractional in 1/32 steps (16.16 scale granularity for
       // upm 2048): mulfix(p*32, em64) === mulfix(p, em64*32) for integers,
       // so this is a no-op for every integer em64 (certification holds).
+      // The quantum is applied AFTER the pen translate, which is what makes it a
+      // per-line effect: the same outline lands on different sub-quantum
+      // fractions on every line, so every line's SHAPE differs a little. On-curve
+      // and control points alike, since a transform pipeline would carry both.
+      const Q = this.outQ64;
+      const qz = Q ? v => Math.round(v / Q) * Q : v => v;
       const pts = raw.map(p => ({
-        x: mulfix(p.x, Math.round(em64x * 32)) + px64,
-        y: mulfix(p.y, -Math.round(em64y * 32)) + py64,
+        x: qz(mulfix(p.x, Math.round(em64x * 32)) + px64),
+        y: qz(mulfix(p.y, -Math.round(em64y * 32)) + py64),
         on: p.on,
       }));
       let limit = pts.length - 1;

@@ -16,6 +16,51 @@ mupdf 1.28, 2026-07-26):
 | x | 5 | snaps to the nearest **¼ px** — 4 phases, and the 5th image is phase 0 one pixel over |
 | y | 2 | rounds to the nearest **whole pixel** — no subpixel y at all |
 
+### 1a. …and it is SIZE-DEPENDENT, which the table above hides
+
+That measurement was taken at **16 px**, and it holds only for `8 ≤ size < 24`.
+The lattice coarsens as the glyph grows. Measured the same way — sweeping one
+pixel of pen travel in 1/64 steps through `fillText` and counting distinct
+rasters, Carlito `m`, mupdf 1.28, 2026-08-03 (rasters = phases + 1, the extra
+image being phase 0 one pixel over):
+
+| size (px) | x rasters | y rasters | x lattice | y lattice |
+|---:|---:|---:|---|---|
+| < 4 | 5 | 5 | ¼ px | **¼ px** |
+| 4 – 8 | 5 | 3 | ¼ px | **½ px** |
+| 8 – 24 | 5 | 2 | ¼ px | whole px |
+| 24 – 48 | **3** | 2 | **½ px** | whole px |
+| ≥ 48 | **2** | 2 | **whole px** | whole px |
+
+Thresholds are exact and inclusive at the bottom: 23.984 gives 5, **24.0 gives
+3**. `size` is `fz_matrix_expansion(ctm)`, i.e. √|ad−bc| — the em in device px
+for an unrotated matrix.
+
+The mechanism is `fz_subpixel_adjust` in mupdf's
+`source/fitz/draw-glyph.c`, and the constants are a **bitmask**, not a divisor:
+`q = 0 / 128 / 192` at `size ≥ 48 / ≥ 24 / else`, applied as
+`*qe = (int)(subpix->e * 256) & q`, so `&192` keeps two bits (4 phases), `&128`
+one (2 phases), `&0` none (1). A second, much lower ladder `qmin = 0 / 128 / 192`
+at `size ≥ 8 / ≥ 4 / else` replaces `q` **on whichever axis the matrix is
+axis-aligned on** — for ordinary upright text `b == c == 0`, so the *vertical*
+axis takes `qmin` and that is why y snaps to whole pixels far earlier than x.
+The function then writes the quantised value back into the caller's matrix
+(`ctm->e = subpix_ctm->e + pix_e`), and `fz_draw_fill_text` blits at
+`floorf(trm.f)` of that modified matrix — so **the discarded remainder is lost
+from the glyph's position, not merely from its cached shape.** There is no
+"continuous baseline, quantised cache" split to exploit.
+
+Load-bearing consequence, and the one live case: `nimbussansbdlin1536`
+(NimbusSans-Bold, em64 1536) is **exactly size 24.0**, where x has 2 phases and
+not 4. Every other shipped set is 10–19 px and sits safely inside the 8–24 band.
+Any future pool at em64 ≥ 1536 must not be generated on a ¼-px x lattice, and
+any at em64 < 512 (size < 8) has a **½-px y lattice** — where
+`fontgen --phases-y 0` and the cert's "`y-phase 32/64` is expected to differ"
+both stop being true.
+
+**Re-measure:** sweep `fillText` at sizes straddling 4, 8, 24 and 48 and count
+distinct rasters per axis, exactly as the table above was made.
+
 SAD against the on-integer render, same glyph:
 
 | offset | +⅛ | +¼ | +½ | +¾ | +1 |
@@ -39,6 +84,53 @@ reason it exists: a real search over pen lattices is impossible through
 **Re-measure:** `npm run certify:ftclone` prints the lattice on every run
 (`probeLattice` in [../ftclone/certify.mjs](../ftclone/certify.mjs)) and names
 any pair other than 5 / 2 as UNEXPECTED.
+
+### 1b. …and above size 256 there is NO lattice at all
+
+The ladder in 1a is the *glyph cache's*. Above a ceiling the glyph leaves the
+cache entirely and is placed continuously. Read from source
+(`fz_render_glyph`, `draw-glyph.c`, mupdf 1.28):
+
+```c
+size = fz_subpixel_adjust(ctx, ctm, &subpix_ctm, &key.e, &key.f);
+if (size <= MAX_GLYPH_SIZE)   /* 256 */   do_cache = 1;
+else { if (is_ft_font) return NULL; ... }
+```
+
+and `fz_draw_fill_text` treats that NULL as *fill the outline instead*:
+
+```c
+glyph = fz_render_glyph(ctx, span->font, gid, &trm, ...);
+if (glyph) { ...blit at floorf(trm.e), floorf(trm.f)... }
+else { fz_path *path = fz_outline_glyph(ctx, span->font, gid, tm);
+       fz_draw_fill_path_aux(ctx, devp, path, 0, in_ctm, ...); }
+```
+
+The path branch uses **`tm` and `in_ctm`** — the unmodified text matrix — so the
+quantisation `fz_subpixel_adjust` already wrote into `trm` is discarded with it.
+So for a **FreeType-backed font** (any embedded TrueType/Type1, i.e. everything
+but Type 3) there are exactly two regimes:
+
+| `size` = √\|ad−bc\| | placement |
+|---|---|
+| ≤ 256 device px | glyph cache, pen on the 1a lattice |
+| > 256 device px | **path fill, pen exactly continuous** |
+
+Type 3 fonts never reach the second regime: `is_ft_font` is false, so they stay
+quantised and merely go uncached.
+
+**The consequence that is resolution-free**, and it is what makes this testable
+on a page whose render resolution is unknown: the cache's y quantum is one
+device pixel, and `size` is the em in device px, so
+
+> the finest y lattice the cache can emit is **em / 256**, in whatever units the
+> em is measured.
+
+Raising the resolution to shrink the device pixel drives `size` toward the same
+ceiling. Measuring a glyph's placement in units of its own em therefore tests
+*both* regimes at once, with no dpi assumption — which is how
+`page-downscale-816x1073` was shown to be path-filled
+([../lab/families.mjs](../lab/families.mjs), 2026-08-03l).
 
 ## 2. Coverage → alpha → page byte
 
