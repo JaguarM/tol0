@@ -115,6 +115,185 @@ if (flag('shift-algebra')) {
   process.exit(worst < 1e-12 ? 0 : 1);
 }
 
+// ---- the forward build's scorer ----------------------------------------------
+// --score-bands <resid.bin> <model.bin>: the five pass-bands of the 08-05e
+// pre-registration, read off a solve's --resid-out / --model-out dumps against
+// the page's own. PASS REQUIRES ALL FIVE SIMULTANEOUSLY; no single number
+// promotes anything, and the bands appear in the BANDS table below AND NOWHERE
+// ELSE in the verdict logic — printed above every score so the verdict layer is
+// checkable by eye. (A verdict line with a magic number in it is itself an
+// unread instrument: 08-05b lost a correct result to one for an afternoon.)
+//
+// It lives here rather than in a new file because this file already owns every
+// other instrument in this hunt, and because the version that read the static
+// and sensitivity arms lived in a scratch directory while the family entry
+// recorded it as committed — a claim this block makes true. Nothing about the
+// numbers changed: the page reads 94.4 / 0.807 / 2.8 % / 0.015 / 0.000 and the
+// static arm 13.2 / 0.768 / 13.6 / 0.001 / 89.87 through both.
+//
+// The page reference (--score-page, --score-k, --score-model) is a DERIVED file,
+// not a constant: regenerate it with
+//   --em 2530 --fy 2.92916 --solve-joint --solve-phase --pin-phase \
+//     --resid-out pg_res.bin --model-out pg_mod.bin --k-out pg_k.bin
+// and check it announces itself — rms 1.6520, k = 6..65 with gaps 6->9 and
+// 10->12. Reading a dump with new Int32Array(readFileSync(f).buffer) starts in
+// whatever Node allocated before it; slice by byteOffset, and assert on a known
+// first value.
+if (opt('score-bands', '')) {
+  const { readFileSync } = await import('node:fs');
+  const BANDS = [
+    { key: 'first-harmonic fraction (h=1..5)', lo: 0.85, hi: 1.00, unit: '%', scale: 100 },
+    { key: 'ellipse axis ratio', lo: 0.71, hi: 0.91, unit: '', scale: 1 },
+    { key: 'four-field reachability', lo: 0.01, hi: 0.10, unit: '%', scale: 100 },
+    { key: 'dM/dy displacement amplitude', lo: 0.008, hi: 0.023, unit: ' out px', scale: 1 },
+    { key: 'principal angle to page plane', lo: 0, hi: 5.0, unit: ' deg', scale: 1 },
+  ];
+  const THETA = +opt('score-theta', '0.05850');
+  const f64 = f => { const b = readFileSync(f);
+                     return new Float64Array(b.buffer, b.byteOffset, b.length / 8); };
+  const kb = readFileSync(opt('score-k', 'pg_k.bin'));
+  const KS = Array.from(new Int32Array(kb.buffer, kb.byteOffset, kb.length / 4));
+  const N = KS.length, TW = 12, TH = 15, C = TW * TH;
+  // The u-fossil fence, which on the marker column is exactly the marker MEAN:
+  // all 57 markers share one x residue, so every u-keyed structure is a
+  // per-marker constant and the varying decomposition already removes it.
+  const fence = s => { const m = [];
+    for (let i = 0; i < N; i++) m.push(Float64Array.from(s.subarray(i * C, (i + 1) * C)));
+    const mn = new Float64Array(C);
+    for (const v of m) for (let c = 0; c < C; c++) mn[c] += v[c] / N;
+    for (const v of m) for (let c = 0; c < C; c++) v[c] -= mn[c];
+    return m; };
+  // The residual's two-dimensional plane, by deflated power iteration.
+  const plane = maps => {
+    const comps = [], L = [];
+    for (let t = 0; t < 2; t++) {
+      let u = new Float64Array(C);
+      for (let c = 0; c < C; c++) u[c] = Math.sin(c * (t + 1.1) + 0.3);
+      for (let it = 0; it < 400; it++) {
+        const a = new Float64Array(N);
+        for (let m = 0; m < N; m++) { let s = 0;
+          for (let c = 0; c < C; c++) s += maps[m][c] * u[c]; a[m] = s; }
+        const nu = new Float64Array(C);
+        for (let m = 0; m < N; m++) for (let c = 0; c < C; c++) nu[c] += a[m] * maps[m][c];
+        for (const p of comps) { let d = 0;
+          for (let c = 0; c < C; c++) d += nu[c] * p[c];
+          for (let c = 0; c < C; c++) nu[c] -= d * p[c]; }
+        let nn = 0; for (let c = 0; c < C; c++) nn += nu[c] * nu[c];
+        nn = Math.sqrt(nn) || 1;
+        for (let c = 0; c < C; c++) nu[c] /= nn; u = nu;
+      }
+      const a = new Float64Array(N);
+      for (let m = 0; m < N; m++) { let s = 0;
+        for (let c = 0; c < C; c++) s += maps[m][c] * u[c]; a[m] = s; }
+      comps.push(u); L.push(a);
+    }
+    return { comps, L };
+  };
+  const psi = KS.map(k => { const u = THETA * k; return u - Math.floor(u); });
+  const fitH = (y, h) => {
+    let s00 = N, s01 = 0, s02 = 0, s11 = 0, s12 = 0, s22 = 0, b0 = 0, b1 = 0, b2 = 0;
+    for (let m = 0; m < N; m++) {
+      const c = Math.cos(2 * Math.PI * h * psi[m]), s = Math.sin(2 * Math.PI * h * psi[m]);
+      s01 += c; s02 += s; s11 += c * c; s12 += c * s; s22 += s * s;
+      b0 += y[m]; b1 += c * y[m]; b2 += s * y[m];
+    }
+    const M = [[s00, s01, s02], [s01, s11, s12], [s02, s12, s22]], v = [b0, b1, b2];
+    for (let a = 0; a < 3; a++) for (let r = a + 1; r < 3; r++) { const f = M[r][a] / M[a][a];
+      for (let c = a; c < 3; c++) M[r][c] -= f * M[a][c]; v[r] -= f * v[a]; }
+    const co = [0, 0, 0];
+    for (let a = 2; a >= 0; a--) { let s = v[a];
+      for (let c = a + 1; c < 3; c++) s -= M[a][c] * co[c]; co[a] = M[a][a] ? s / M[a][a] : 0; }
+    const mu = Array.from(y).reduce((s, x) => s + x, 0) / N;
+    let ss = 0, tt = 0;
+    for (let m = 0; m < N; m++) {
+      const f = co[0] + co[1] * Math.cos(2 * Math.PI * h * psi[m])
+                      + co[2] * Math.sin(2 * Math.PI * h * psi[m]);
+      ss += (y[m] - f) ** 2; tt += (y[m] - mu) ** 2;
+    }
+    return { r2: 1 - ss / tt, a: co[1], b: co[2], tt };
+  };
+  // The LARGER principal angle between two planes — the pair must match as a
+  // plane, not merely share a direction.
+  const angles = (V, W) => {
+    const M = [[0, 0], [0, 0]];
+    for (let a = 0; a < 2; a++) for (let b = 0; b < 2; b++) { let s = 0;
+      for (let c = 0; c < C; c++) s += V[a][c] * W[b][c]; M[a][b] = s; }
+    const t = M[0][0] ** 2 + M[0][1] ** 2 + M[1][0] ** 2 + M[1][1] ** 2;
+    const d = Math.abs(M[0][0] * M[1][1] - M[0][1] * M[1][0]);
+    const s2 = Math.sqrt(Math.max(0, (t - Math.sqrt(Math.max(0, t * t - 4 * d * d))) / 2));
+    return Math.acos(Math.min(1, Math.max(-1, s2))) * 180 / Math.PI;
+  };
+  const measure = (residFile, modelFile) => {
+    const RES = f64(residFile), MOD = f64(modelFile);
+    const P = plane(fence(RES));
+    const H = [];
+    for (let h = 1; h <= 5; h++) { const f0 = fitH(P.L[0], h), f1 = fitH(P.L[1], h);
+      H.push((f0.r2 * f0.tt + f1.r2 * f1.tt) / (f0.tt + f1.tt)); }
+    const h1frac = H[0] / H.reduce((s, x) => s + x, 0);
+    const g0 = fitH(P.L[0], 1), g1 = fitH(P.L[1], 1);
+    const tr = g0.a ** 2 + g0.b ** 2 + g1.a ** 2 + g1.b ** 2;
+    const dt = Math.abs(g0.a * g1.b - g0.b * g1.a);
+    const r = Math.sqrt(Math.max(0, tr * tr - 4 * dt * dt));
+    const s1 = Math.sqrt((tr + r) / 2), s2 = Math.sqrt((tr - r) / 2);
+    // Per marker, least-squares the residual onto four fields DERIVED FROM THE
+    // MODEL the solve fitted — dM/dy (a y displacement), dM/dx, M itself (gain)
+    // and ∇²M (blur) — plus a constant. UNCENTERED, because centering the target
+    // deletes the very direction the constant basis vector exists to explain.
+    const at = (A, y, x) => A[Math.min(TH - 1, Math.max(0, y)) * TW
+                            + Math.min(TW - 1, Math.max(0, x))];
+    let expl = 0, tot = 0; const dy = new Float64Array(N);
+    for (let m = 0; m < N; m++) {
+      const M0 = MOD.subarray(m * C, (m + 1) * C), R = RES.subarray(m * C, (m + 1) * C);
+      const B = [new Float64Array(C), new Float64Array(C), Float64Array.from(M0),
+                 new Float64Array(C), new Float64Array(C).fill(1)];
+      for (let y = 0; y < TH; y++) for (let x = 0; x < TW; x++) {
+        B[0][y * TW + x] = 0.5 * (at(M0, y + 1, x) - at(M0, y - 1, x));
+        B[1][y * TW + x] = 0.5 * (at(M0, y, x + 1) - at(M0, y, x - 1));
+        B[3][y * TW + x] = at(M0, y + 1, x) + at(M0, y - 1, x) + at(M0, y, x + 1)
+                         + at(M0, y, x - 1) - 4 * at(M0, y, x);
+      }
+      const P5 = 5, A = Array.from({ length: P5 }, () => new Float64Array(P5));
+      const rhs = new Float64Array(P5);
+      for (let a = 0; a < P5; a++) {
+        for (let b = 0; b < P5; b++) { let s = 0;
+          for (let c = 0; c < C; c++) s += B[a][c] * B[b][c]; A[a][b] = s; }
+        let s = 0; for (let c = 0; c < C; c++) s += B[a][c] * R[c]; rhs[a] = s;
+      }
+      for (let a = 0; a < P5; a++) for (let r2 = a + 1; r2 < P5; r2++) {
+        const f = A[r2][a] / (A[a][a] || 1e-12);
+        for (let c = a; c < P5; c++) A[r2][c] -= f * A[a][c]; rhs[r2] -= f * rhs[a];
+      }
+      const co = new Float64Array(P5);
+      for (let a = P5 - 1; a >= 0; a--) { let s = rhs[a];
+        for (let c = a + 1; c < P5; c++) s -= A[a][c] * co[c];
+        co[a] = A[a][a] ? s / A[a][a] : 0; }
+      dy[m] = co[0];
+      for (let c = 0; c < C; c++) { let f = 0;
+        for (let a = 0; a < P5; a++) f += co[a] * B[a][c];
+        expl += f * f; tot += R[c] * R[c]; }
+    }
+    const disp = Math.sqrt(2) * Math.sqrt(Array.from(dy).reduce((s, x) => s + x * x, 0) / N);
+    const PAGE = plane(fence(f64(opt('score-page', 'pg_res.bin')))).comps;
+    return [h1frac, s1 > 0 ? s2 / s1 : 0, expl / tot, disp, angles(PAGE, P.comps)];
+  };
+  const [rf, mf] = opt('score-bands', '').split(',');
+  console.log('DECLARED PASS-BANDS (readback from BANDS; source: families.mjs, 08-05e):');
+  for (const b of BANDS) console.log('  ' + b.key.padEnd(34) + 'accept [' +
+    (b.lo * b.scale).toFixed(b.scale === 100 ? 0 : 3) + ', ' +
+    (b.hi * b.scale).toFixed(b.scale === 100 ? 0 : 3) + ']' + b.unit);
+  const v = measure(rf, mf);
+  console.log(`\nARM: ${opt('score-label', rf)}   (${N} markers, k = ${KS[0]}..${KS[N - 1]}, θ = ${THETA})`);
+  let all = true;
+  for (let i = 0; i < 5; i++) {
+    const b = BANDS[i], inb = v[i] >= b.lo && v[i] <= b.hi; if (!inb) all = false;
+    console.log('  ' + b.key.padEnd(34) +
+      (v[i] * b.scale).toFixed(b.scale === 100 ? 1 : 3).padStart(8) + b.unit +
+      '   ' + (inb ? 'IN BAND' : 'out of band'));
+  }
+  console.log('\n  CONJUNCTION: ' + (all ? 'ALL FIVE IN BAND' : 'NOT all five in band'));
+  process.exit(0);
+}
+
 // ---- the null ----------------------------------------------------------------
 // At scale 1 with box(1) kernels the resample is the identity, so the whole
 // path — render, fz composite, resample, pen line, scoring — must reproduce a
@@ -846,6 +1025,112 @@ if (flag('synth')) {
     }
     return true;
   };
+  // --synth-cover <rule>: THE COVERAGE-NONLINEAR RASTERIZER, and it is the one
+  // generator here that is NOT a way of moving the pen. Three sessions of
+  // elimination (08-05 … 08-05g) leave exactly one class alive for the third
+  // accumulator: a gen-1 rasterizer whose COVERAGE is a nonlinear function of
+  // the glyph's sub-pixel y phase — thresholding, or supersampling on a coarse
+  // internal lattice. Everything whose render is M(y + δ) to first order is
+  // PRE-REFUTED by the four-rung --synth-peny-lattice ladder, which matched the
+  // page's rate and (at n = 512) its displacement and still read reachability
+  // 49.1 %, axis ratio 0.042 and a principal angle of 83.91°. So the filter's
+  // job is specifically to convert PHASE into COVERAGE REDISTRIBUTION.
+  //
+  // THE MODEL. gen-1 rasterizes onto an internal y lattice of spacing `a` source
+  // px — its own device grid, not ours — decides each cell's ink by a rule that
+  // is not exact area, and that piecewise-constant image is what our 1-src-px
+  // source raster samples. The rules, all zero-parameter, named before any run:
+  //   area    V = C                 the IDENTITY rule — a CONTROL, not a
+  //                                 candidate: linear in coverage, so whatever
+  //                                 fingerprint it shows belongs to the moving
+  //                                 lattice rather than to any nonlinearity.
+  //   thresh  V = [C ≥ ½]           bitonal supersampling, the half-coverage rule
+  //   scan    V = coverage along     scanline conversion: exact in x, SAMPLED in
+  //           the cell's centre      y, which is what most RIPs actually do
+  //   any     V = [C > 0]           conservative fill / dropout control
+  //   full    V = [C = 1]           the pessimistic rule, interior cells only
+  //
+  // THE PHASE IS TAKEN FROM THE NOMINAL y, NOT FROM THE PEN, and that is a
+  // MEASURED configuration rather than a modelling convenience: post-wobble
+  // quantization would put ψ_k = frac(c + kθ + β·frac(kφ)) and hence sidebands at
+  // θ ± mφ with amplitude ratio β/m, and 08-05d measured β ≤ 0.184 cycles, which
+  // excludes G ≥ 1 in every unit convention. So the lattice slides WITH the pen's
+  // wobble and the glyph's residue on it is frac(y_nominal / a) — configured
+  // upstream, exactly as the sideband bound says the producer's is.
+  //
+  // THE RATE IS HELD AT THE PAGE'S OWN θ BY CONSTRUCTION: a = pitch/(n + θ) makes
+  // frac(pitch/a) = θ for any integer n, so `n` moves the lattice's COARSENESS
+  // over 32× at fixed rate — the same axis, and the same rungs, as the amplitude
+  // ladder. That is deliberate. Every named physical grid was already excluded as
+  // a point prediction of θ (08-05, seven grids, all ≥ 24σ), so a grid run at
+  // named-unit spacings would miss on RATE and say nothing about FORM. Naming a
+  // spacing directly (--synth-cover-a) is still available and prints the rate it
+  // implies. θ = 0 is the generator's own no-modulation control: the residue is
+  // then constant in k and the arm must read the static arm's null.
+  //
+  // Cell coverage is EXACT, not supersampled: the render is done at a raster of
+  // sub-rows a/M tall, and C is their mean, which is the cell's area coverage
+  // identically. M buys resolution for `scan` (the centre strip is a/M thick) and
+  // nothing else, so it is an instrument parameter and is printed as one.
+  const COVRULES = ['area', 'thresh', 'scan', 'any', 'full'];
+  const COVR = opt('synth-cover', '');
+  if (COVR && !COVRULES.includes(COVR)) {
+    console.error(`--synth-cover must be one of ${COVRULES.join(', ')}`); process.exit(2);
+  }
+  const COVN = +opt('synth-cover-n', '512');
+  const COVTH = +opt('synth-cover-theta', '0.05850');
+  const COVSUB = Math.max(1, Math.round(+opt('synth-cover-sub', '32')));
+  const covA = +opt('synth-cover-a', '0') || PSRC / (COVN + COVTH);
+  const covRate = (r => r - Math.floor(r))(PSRC / covA);
+  let covV = new Float64Array(0);
+  // Returns false exactly when a plain render would have. yNom is the line's
+  // NOMINAL absolute source y — the pen before any wobble — and is the only
+  // thing the lattice phase is allowed to see.
+  const renderCover = (em, px64, py64, yNom) => {
+    const a = covA, sub = COVSUB, h = a / sub;
+    const psi = yNom / a - Math.floor(yNom / a);
+    const pen = py64 / 64;
+    let y0 = pen - psi * a;                  // a cell boundary, by construction
+    y0 -= Math.ceil(y0 / a) * a;             // slid into (−a, 0] so cell 0 is real
+    const nc = Math.ceil((SH - y0) / a) + 1, nf = nc * sub;
+    const saveW = clone.W, saveH = clone.H;
+    clone.W = SW; clone.H = nf;
+    clone.cache.clear();                     // the cache key does NOT carry W/H
+    const cov = clone.coverage(CP, em, Math.round(EMY / h * 32) / 32,
+                               px64, Math.round((pen - y0) / h * 64));
+    clone.W = saveW; clone.H = saveH; clone.cache.clear();
+    if (!cov) return false;
+    if (covV.length !== nc * SW) covV = new Float64Array(nc * SW);
+    const mid = sub >> 1;
+    for (let j = 0; j < nc; j++) {
+      for (let x = 0; x < SW; x++) {
+        let s = 0;
+        for (let r = 0; r < sub; r++) s += cov[(j * sub + r) * SW + x];
+        const C = s / (sub * 255);
+        covV[j * SW + x] = COVR === 'area' ? C
+          : COVR === 'thresh' ? (C >= 0.5 ? 1 : 0)
+          : COVR === 'any' ? (C > 0 ? 1 : 0)
+          : COVR === 'full' ? (C >= 1 - 1e-9 ? 1 : 0)
+          : cov[(j * sub + mid) * SW + x] / 255;             // scan
+      }
+    }
+    // The cells are what gen-1 emitted; our source pixel is their exact-area
+    // resampling onto the 1-src-px grid. Overlaps sum to 1 px by construction.
+    for (let y = 0; y < SH; y++) {
+      const j0 = Math.max(0, Math.floor((y - y0) / a));
+      const j1 = Math.min(nc - 1, Math.ceil((y + 1 - y0) / a) - 1);
+      for (let x = 0; x < SW; x++) {
+        let acc = 0;
+        for (let j = j0; j <= j1; j++) {
+          const cl = y0 + j * a, ov = Math.min(y + 1, cl + a) - Math.max(y, cl);
+          if (ov > 0) acc += ov * covV[j * SW + x];
+        }
+        const g = Math.round(255 * acc);
+        src[y * SW + x] = g > 0 ? LAWF(g > 255 ? 255 : g) : 255;
+      }
+    }
+    return true;
+  };
   const RAMP = +opt('synth-ramp', '0');
   const BOUT = RAMP * b.fy / P42;                 // src px of phase per output row
   const RPHI0 = +opt('synth-ramp-phi0', '0');
@@ -923,7 +1208,9 @@ if (flag('synth')) {
     // blend moves it, by exactly δ·g, which is the whole claim.
     const dsh = SHIFT ? (SHPHI * i.k - Math.floor(SHPHI * i.k)) : 0;
     i.injD = dsh;
-    if (!renderShift(sem, px64, py64, dsh)) { console.error('synth: no raster'); process.exit(2); }
+    const ok = COVR ? renderCover(sem, px64, py64, b.line.Y0 + PSRC * i.k)
+                    : renderShift(sem, px64, py64, dsh);
+    if (!ok) { console.error('synth: no raster'); process.exit(2); }
     i.target = forward(i, WXs, WYs);
     SRCF = null;
     // --synth-add: add a per-marker map to the generated target. Built for the
@@ -977,6 +1264,9 @@ if (flag('synth')) {
     (jitx ? `, plus a RANDOM PEN-X jitter of sd ${jitx} src px` : '') +
     (OUTQ ? `, with the transformed OUTLINE POINTS quantised to 1/${OUTQ} src px after the pen translate` : '') +
     (QPENY ? `, with the PEN Y then SNAPPED to a lattice of ${QPENY} src px (the glyph-cache control)` : '') +
+    (COVR ? `, RASTERIZED BY THE '${COVR}' RULE on an internal y lattice of ${covA.toFixed(6)} src px `
+      + `(${COVSUB} sub-rows per cell; the phase walks at frac(pitch/a) = ${covRate.toFixed(6)} per line, `
+      + `taken from the NOMINAL y so the lattice rides with any wobble)` : '') +
     (VSC ? `, plus a RANDOM PER-LINE VERTICAL SCALE of relative sd ${VSC} (re-rasterised at em64y·(1+s))` : '') +
     (VSCS ? `, plus a DETERMINISTIC PER-LINE VERTICAL SCALE, sd ${VSCS}, sawtooth frac(k·${VPHI})` : '') +
     (QY || QX ? `, sampling PHASE-QUANTISED to 1/${QY || '-'} src px in y and 1/${QX || '-'} in x` : '') +

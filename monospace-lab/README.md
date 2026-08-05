@@ -731,6 +731,63 @@ two branches, so quote that as suggestive, never as decisive.
 > `--solve-joint` number recorded for this family needs `--em 2530 --fy
 > 2.92916`.
 
+### `--synth-cover` — the coverage-nonlinear rasterizer, and `--score-bands` reading it
+
+The last mechanism class standing for the third accumulator was a gen-1
+rasterizer whose **coverage is a nonlinear function of the sub-pixel y phase**.
+Everything whose render is `M(y + δ)` to first order is pre-refuted, so this
+generator does not move a pen: it rasterizes on an internal y lattice of spacing
+`a` source px and decides each cell's ink by a named zero-parameter rule.
+
+```bash
+node monospace-lab/resample-fit.mjs --em 2530 --fy 2.92916 --synth \
+  --synth-cover thresh --synth-cover-n 512 \
+  --solve-joint --solve-phase --pin-phase --resid-out r.bin --model-out m.bin
+node monospace-lab/resample-fit.mjs --score-bands r.bin,m.bin \
+  --score-page pg_res.bin --score-k pg_k.bin
+```
+
+| rule | V per cell | |
+|---|---|---|
+| `area` | `C` | the identity — **a control**, linear in coverage |
+| `thresh` | `[C ≥ ½]` | bitonal supersampling |
+| `scan` | coverage on the centre scanline | exact in x, *sampled* in y |
+| `any` | `[C > 0]` | conservative fill |
+| `full` | `[C = 1]` | the pessimistic rule |
+
+Cell coverage is **exact, not supersampled**: the render runs on sub-rows `a/32`
+tall and `C` is their mean, which *is* the cell's area coverage — the
+subdivision buys resolution for `scan` and nothing else. Cells are resampled onto
+the 1-src-px grid by exact area overlap, so the solve sees the piecewise-constant
+image gen-1 would have emitted.
+
+**Two things about it that are measured, not chosen.** The lattice phase comes
+from the **nominal** y, so the lattice rides with any wobble — that configuration
+is what the sideband bound `β ≤ 0.184` cycles forces. And `a = pitch/(n + θ)`
+holds `frac(pitch/a) = θ` for every integer `n`, so **the rate is not a free
+parameter** and `n` moves only the coarseness.
+
+> **Trap: a raw target cannot be read.** At `--synth-cover-theta 0` — no per-line
+> phase walk at all — the generated targets still carry **35.5 % marker-varying
+> energy**. That is not a bug: it is one *shared* source difference sampled at the
+> 57 distinct `δ_k` of the resample. Only the solve, whose free shared source
+> absorbs it, separates a per-line mechanism from a shared source change.
+
+`--score-bands` is the forward build's scorer: five pass-bands declared in
+`families.mjs` before any render, printed above every score and appearing nowhere
+else in the verdict logic. **Pass requires all five simultaneously.** The page
+reads 94.4 % / 0.807 / 2.8 % / 0.015 out px / 0.000°; the no-quarry static arm
+reads 13.2 / 0.768 / 13.6 / 0.001 / 89.87. The page reference is a *derived*
+file — regenerate with the same solve plus `--k-out`, and check it announces
+itself (rms 1.6520, k = 6..65 with gaps 6→9 and 10→12).
+
+**The grid was read once (5 rules × 4 rungs) and no cell landed the
+conjunction.** What it did show: this class reproduces the page's *form* —
+first-harmonic 86–97 %, axis ratio 0.68–0.88, reachability 4–8 % — where every
+displacement mechanism reads 66–75 %, 0.008–0.042 and 49–63 %. It does not
+reproduce the plane's identity at any named member. Full table in the family
+entry, 08-05h.
+
 ### The geometry is pinned by a law, not a fit
 
 `--aspect` exists because the ~6 % vertical excess has two possible homes, and
