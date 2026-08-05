@@ -1,5 +1,5 @@
 ---
-description: The page-downscale family (17 documents, 816×1073) — the residual is two-dimensional and its per-line phase rate is PINNED at 0.0585 on raw pixels; the open job is a mechanism
+description: The page-downscale family (17 documents, 816×1073) — rate pinned at 0.0585, forward build pre-registered and its arms green; write the nonlinear-coverage generator, then read the grid once
 ---
 
 The `page-downscale-816x1073` family — **17 documents, 100 % □, no pool**. Not
@@ -10,9 +10,14 @@ construction. Reading them at tolerance 0 requires reproducing the PIPELINE.
 Full record, with every number and every refutation:
 [lab/families.mjs](../../lab/families.mjs) → the `page-downscale-816x1073`
 entry. **Read that entry first** — this brief is the work order, that entry is
-the evidence, and it now compresses seventeen dated blocks (08-02 … 08-04f). Do
-not re-open anything the entry marks refuted; the list is long and every item
-on it cost a session.
+the evidence, and it now compresses twenty-four dated blocks (08-02 … 08-05g).
+Do not re-open anything the entry marks refuted; **the refuted-candidate list is
+eleven entries long** and every item on it cost a session.
+
+**The mechanism class is narrowed to coverage-nonlinear rasterization**
+(thresholding, or supersampling on a coarse internal lattice), **configured
+upstream of the wobble** — that configuration is measured, not assumed, by the
+sideband bound β ≤ 0.184 cycles (08-05d).
 
 ## WHERE THIS STANDS — read before anything else
 
@@ -68,24 +73,67 @@ The alarm that caught it was the **no-quarry synth control clearing the same
 criterion as the page** on the full band. Keep running controls in the same
 instrument in the same run; that is the only reason this was caught.
 
-### THE NEXT JOB
+### THE NEXT JOB — one piece of code, then the grid is read ONCE
 
-**A mechanism, and it now has a narrow specification to meet.** Rate → mechanism
-→ arithmetic. **No arithmetic on 0.0585 yet** — no rational near-miss hunting,
-and 1/17.1 is precisely the bait the ledger's 0.20692-vs-φ and m = 44 entries
-exist to refuse. The producer stored φ = 0.207037 and u = 0.205665 as raw
-constants matching nothing rational; its third owes nobody a clean fraction.
+**Write the nonlinear-coverage generator in
+[monospace-lab/resample-fit.mjs](../../monospace-lab/resample-fit.mjs).** That
+is the only thing standing between this position and one of two terminal
+outcomes. Everything else the forward build needs is committed and gated:
+pass-bands (`7e194f8`), scorer with its `BANDS` table, static arm, sensitivity
+ladder, angle null.
 
-What the mechanism must be, all measured — this is the target, not a wish list:
+**What the generator must do:** rasterize the marker glyph so that **coverage is
+a nonlinear function of subpixel y phase** — thresholding, or supersampling on a
+coarse internal lattice. Not a moved pen. `--synth-peny-lattice` already covers
+the moved pen and it is **refuted** (below).
 
-- **smooth in the phase** (94 % first harmonic), **elliptical in the plane**
-  (axis ratio 0.807 — two spatial patterns in near-quadrature, not one),
-- **orthogonal to all four first-order image deformations** — not a
-  displacement, not a gain change, not a blur of the fitted model (2.8 %),
-- worth **~1.155 of the 1.647 bytes**, leaving ~1.18 that something else owns,
-- keyed in map **shape** not amplitude (amplitude alone: R² 32.6 % against a
-  null max of 46.4 %, does not clear), on a page with **no index drift**
-  (corr(map-distance, |kᵢ−kⱼ|) = −0.0222, against +0.5552 on the control).
+**The conjunction — PASS requires all five simultaneously.** No single number
+promotes anything:
+
+| # | statistic | accept | weight |
+|---|---|---|---|
+| 1 | first-harmonic fraction (h=1..5) | [85, 100] % | supporting |
+| 2 | ellipse axis ratio | [0.71, 0.91] | see below |
+| 3 | four-field reachability | [1, 10] % | **load-bearing** |
+| 4 | dM/dy displacement | [0.008, 0.023] px | **load-bearing** |
+| 5 | principal angle to page plane | ≤ 5.0° | **sharpest** |
+
+Page reads 94.4 / 0.807 / 2.8 % / 0.015 / 0.000 — all five, by construction.
+
+**Band 2 is directional, not weak.** Weak as a *pass* criterion (the no-quarry
+static arm reads 0.768, in band, by accident); **strong as a fail criterion**
+against displacement mechanisms, which collapse it to 0.008–0.042 because they
+modulate one pattern, not two. The statistic didn't change — its null did.
+
+**Band 5's null is measured, ten draws**: no-quarry arms 56.69–77.47°,
+wrong-form injected mechanisms 83.91–85.31°, static arm 89.87°. Note the
+wrong-form rungs sit *farther* than noise — a displacement plane is a specific
+wrong direction, not a random one. So 5.0° isn't just 11× below the null
+minimum; nothing in ten draws came within **50°** of it.
+
+**Pre-refuted cells — do not count their misses as independent evidence.** If a
+filter's render is `M(y + δ)` to first order, the four-rung ladder already
+killed it. Bilinear/tent-as-pen-shift is the dead cell under another name.
+
+**The most valuable control the family owns: the n = 512 rung.** At the page's
+rate, at the page's amplitude, it matches band 4 *by construction* (0.017 vs
+0.0152) and still fails three voices (reachability 49.1 %, axis ratio 0.042,
+angle 83.91°). It is the pre-answered form of "but the displacement matches!"
+Quote it whenever a single-number agreement turns up.
+
+**No amplitude excuse in either direction.** Detection is flat over 26× down to
+the certified 0.0212 px operating point, so presence statistics saturate on
+*form*, not energy: a miss can't hide behind "too faint", a hit can't be
+dismissed as "only visible because strong".
+
+**Then:** if the grid lands, the origin scan — collapse target **~1.18 and no
+further** (hitting the floor contradicts the measured 59.8 % share). If it
+misses with the ladder green, the certified-□ closure. Both are findings.
+
+**No arithmetic on 0.0585** until a mechanism predicts a value. 1/17.1 is the
+bait the ledger's 0.20692-vs-φ and m = 44 entries exist to refuse, and
+**2.61545 src px is not a producer constant** — it was reverse-engineered from
+θ to build the sensitivity arm.
 
 Also unsurveyed and not to be described as empty: **θ ≳ 0.5**, where the scan
 recovers 1/12 even at full amplitude. The licensed sentence is "structure found
